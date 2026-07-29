@@ -6,6 +6,19 @@ import { Canvas } from '@react-three/fiber';
 import { Loader } from '@react-three/drei';
 import TheatreScene from './TheatreScene';
 
+interface Seat {
+  id: string;
+  row: number;
+  seat: number;
+  available: boolean;
+  position: { x: number; z: number };
+}
+
+interface RowMap {
+  row: string;
+  seats: Seat[];
+}
+
 export default function TheatrePage() {
   const [isStarted, setIsStarted] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
@@ -14,12 +27,12 @@ export default function TheatrePage() {
   // Seat layout configuration - 7 rows x 18 seats
   const rows = 7;
   const seatsPerRow = 18;
-  const seatMap = [];
+  const seatMap: RowMap[] = [];
   
   // Reverse the rows so Row A is closest to screen (bottom of grid)
   for (let r = rows - 1; r >= 0; r--) {
     const rowLetter = String.fromCharCode(65 + (rows - 1 - r)); // A, B, C, D, E, F, G
-    const seats = [];
+    const seats: Seat[] = [];
     for (let s = 0; s < seatsPerRow; s++) {
       const seatNumber = s + 1;
       // Some seats taken for realism (middle seats in first row taken)
