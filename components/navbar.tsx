@@ -9,6 +9,7 @@ import {
   FaBars, 
   FaTimes,
   FaHome,
+  FaFilm,
   FaQuestionCircle,
 } from 'react-icons/fa';
 import { 
@@ -52,6 +53,11 @@ export default function Navbar() {
             href: '/quizzes', 
             icon: <FaQuestionCircle className="text-sm" /> 
         },
+        { 
+            name: 'Theatre', 
+            href: '/theatre', 
+            icon: <FaFilm className="text-sm" /> 
+        }
     ];
 
     const handleSearchSubmit = (e: React.FormEvent) => {
