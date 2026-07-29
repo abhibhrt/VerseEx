@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-verseex-float: verseex-float 8s ease-in-out infinite;
+
+  @keyframes verseex-float {
+
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+}
+
+::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(0, 10, 97);
+  border-radius: 50px;
+}
+
+
+/* ========================= */
+/* LOADER */
+/* ========================= */
+@keyframes rocketFly {
+  0% {
+    transform: translateY(0px) rotate(-45deg) scale(0.9);
+  }
+
+  50% {
+    transform: translateY(-100px) rotate(-45deg) scale(1.05);
+  }
+
+  100% {
+    transform: translateY(-100px) rotate(-45deg) scale(0.9);
+  }
+}
+
+@keyframes smokePuff {
+  0% {
+    transform: translateY(10px) scale(0);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(200px) scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes smokePuffDelayed {
+  0% {
+    transform: translateY(0) scale(0);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: translateY(200px) scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes smokePuffSlow {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: translateY(-100px);
+  }
+
+  100% {
+    transform: translateY(-100px);
+  }
+}
+
+.animate-rocket-fly {
+  animation: rocketFly 5s ease-in-out infinite;
+}
+
+.animate-smoke-puff {
+  animation: smokePuff 0.6s ease-out infinite;
+}
+
+.animate-smoke-puff-delayed {
+  animation: smokePuffDelayed 0.6s ease-out 0.2s infinite;
+}
+
+.animate-smoke-puff-slow {
+  margin-top: 20px;
+  animation: smokePuffSlow 5s ease-in-out infinite;
+}
+
+.my-fontstyle{
+  font-family: Brush Script MT, Brush Script Std, cursive;
+}
