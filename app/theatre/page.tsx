@@ -135,15 +135,6 @@ export default function TheatrePage() {
                   </div>
                 ))}
               </div>
-
-              {/* Arrow indicator showing direction to screen */}
-              <div className="flex justify-center mt-3">
-                <div className="text-neutral-600 text-xs flex items-center gap-2">
-                  <span>↓</span>
-                  <span>Screen</span>
-                </div>
-              </div>
-
               {/* Legend */}
               <div className="flex justify-center gap-4 mt-3 text-xs">
                 <div className="flex items-center gap-1.5">
@@ -194,39 +185,11 @@ export default function TheatrePage() {
                 </button>
               </div>
             </div>
-
-            {/* Controls Info */}
-            <div className="mt-4 text-center text-neutral-600 text-xs space-x-3">
-              <span>🎮 WASD to move</span>
-              <span>🖱️ Mouse to look</span>
-              <span>💺 Click seat to sit</span>
-              <span>⎋ ESC to stand</span>
-            </div>
           </div>
         </div>
       ) : (
         // Theatre Experience
         <>
-          {/* Controls Overlay */}
-          <div className="absolute top-4 left-4 z-20 pointer-events-none bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/10 text-white/80 text-xs space-y-1">
-            <p><strong className="text-white">WASD / Arrow Keys:</strong> Move</p>
-            <p><strong className="text-white">Mouse Drag:</strong> Look Around</p>
-            <p><strong className="text-white">Click Seat:</strong> Sit Down</p>
-            <p><strong className="text-white">ESC:</strong> Stand Up</p>
-            {selectedSeat && (
-              <p className="text-red-400 mt-1">🎯 Seat {selectedSeat} Selected</p>
-            )}
-          </div>
-
-          {/* VerseEx Branding */}
-          <div className="absolute top-4 right-4 z-20 pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/10">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-amber-500 font-bold text-sm tracking-wider">
-                VERSE<span className="text-white">EX</span>
-              </span>
-            </div>
-          </div>
-
           <Canvas
             shadows
             camera={{ position: [0, 2, 15], fov: 60 }}

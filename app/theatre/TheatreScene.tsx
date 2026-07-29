@@ -11,64 +11,19 @@ import TheatreSeats from './TheatreSeats';
 interface TheatreSceneProps {
   isStarted: boolean;
   initialSeat?: [number, number, number];
-  videoSrc?: string;
 }
 
 export default function TheatreScene({ 
   isStarted, 
-  initialSeat, 
-  videoSrc = 'https://res.cloudinary.com/dcrcx494u/video/upload/v1781030139/projects_portfolio/rkdyw5eqtzkaqepfuebh.mp4'
+  initialSeat
 }: TheatreSceneProps) {
   const [seated, setSeated] = useState(false);
   const [seatPos, setSeatPos] = useState<[number, number, number]>(initialSeat || [0, 0, 0]);
-  const [videoLoaded, setVideoLoaded] = useState(false);
   const [autoSeated, setAutoSeated] = useState(false);
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
 
-  const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
   useEffect(() => {
-    const video = document.createElement('video');
-    video.src = videoSrc;
-    video.crossOrigin = 'anonymous';
-    video.loop = true;
-    video.muted = false;
-    video.playsInline = true;
-    video.preload = 'auto';
-
-    const handleLoadedData = () => {
-      setVideoLoaded(true);
-      if (videoTexture) {
-        videoTexture.needsUpdate = true;
-      }
-    };
-
-    video.addEventListener('loadeddata', handleLoadedData);
-    videoRef.current = video;
-    video.load();
-
-    const texture = new THREE.VideoTexture(video);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    setVideoTexture(texture);
-
-    const handlePlayEvent = () => {
-      if (videoRef.current) {
-        videoRef.current.muted = false;
-        videoRef.current.play().then(() => {
-          if (videoTexture) {
-            videoTexture.needsUpdate = true;
-          }
-        }).catch((e) => console.log('Playback error:', e));
-      }
-    };
-
-    window.addEventListener('play-theatre-video', handlePlayEvent);
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSeated(false);
@@ -95,36 +50,14 @@ export default function TheatreScene({
     }
 
     return () => {
-      window.removeEventListener('play-theatre-video', handlePlayEvent);
       window.removeEventListener('keydown', handleKeyDown);
-      video.removeEventListener('loadeddata', handleLoadedData);
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = '';
-        videoRef.current.load();
-      }
     };
-  }, [videoSrc]);
-
-  useEffect(() => {
-    if (isStarted && videoRef.current && videoLoaded) {
-      videoRef.current.muted = false;
-      videoRef.current.play().then(() => {
-        if (videoTexture) {
-          videoTexture.needsUpdate = true;
-        }
-      }).catch((e) => console.log('Autoplay error:', e));
-    }
-  }, [isStarted, videoLoaded]);
+  }, []);
 
   useFrame(() => {
-    if (videoTexture && videoRef.current && !videoRef.current.paused) {
-      videoTexture.needsUpdate = true;
-    }
-    
     if (seated && controlsRef.current) {
-      camera.position.set(seatPos[0], seatPos[1] + 0.8, seatPos[2] + 2.5);
-      controlsRef.current.target.set(seatPos[0], 6.5, -22);
+      camera.position.set(seatPos[0], seatPos[1] + 0.9, seatPos[2] + 0.3);
+      controlsRef.current.target.set(seatPos[0], 6.2, -22);
     }
   });
 
@@ -132,16 +65,16 @@ export default function TheatreScene({
     setSeatPos(position);
     setSeated(true);
     if (controlsRef.current) {
-      camera.position.set(position[0], position[1] + 0.8, position[2] + 2.5);
-      controlsRef.current.target.set(position[0], 6.5, -22);
+      camera.position.set(position[0], position[1] + 0.9, position[2] + 0.3);
+      controlsRef.current.target.set(position[0], 6.2, -22);
       
       controlsRef.current.enableZoom = false;
       controlsRef.current.enablePan = false;
       
-      controlsRef.current.minAzimuthAngle = -0.8;
-      controlsRef.current.maxAzimuthAngle = 0.8;
-      controlsRef.current.minPolarAngle = Math.PI / 2 - 0.4;
-      controlsRef.current.maxPolarAngle = Math.PI / 2 + 0.1;
+      controlsRef.current.minAzimuthAngle = -0.5;
+      controlsRef.current.maxAzimuthAngle = 0.5;
+      controlsRef.current.minPolarAngle = Math.PI / 2 - 0.3;
+      controlsRef.current.maxPolarAngle = Math.PI / 2 + 0.15;
     }
   };
 
@@ -201,7 +134,8 @@ export default function TheatreScene({
         <pointLight key={`steplight-${i}`} position={[0, 0.2, -2 - i * 2.0]} intensity={0.02} color="#ff6600" distance={3} />
       ))}
 
-      <TheatreScreen texture={videoTexture} />
+      {/* Pass isStarted to TheatreScreen */}
+      <TheatreScreen isStarted={isStarted} />
       <TheatreSeats onSeatClick={handleSeatClick} selectedSeat={autoSeated ? seatPos : undefined} />
 
       <mesh position={[18, 7, -20]}>
