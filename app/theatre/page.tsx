@@ -1,9 +1,9 @@
 // app/theatre/page.tsx
 'use client';
 
-import React, { useState, Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Loader } from '@react-three/drei';
+import React, { useState, Suspense, useEffect } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { Loader, DeviceOrientationControls } from '@react-three/drei';
 import TheatreScene from './TheatreScene';
 
 interface Seat {
@@ -30,7 +30,6 @@ export default function TheatrePage() {
   const seatsPerRow = 18;
   const seatMap: RowMap[] = [];
   
-  // Reverse the rows so Row A is closest to screen (bottom of grid)
   for (let r = rows - 1; r >= 0; r--) {
     const rowLetter = String.fromCharCode(65 + (rows - 1 - r));
     const seats: Seat[] = [];
@@ -52,6 +51,11 @@ export default function TheatrePage() {
     if (selectedSeat) {
       setIsStarted(true);
       window.dispatchEvent(new CustomEvent('play-theatre-video'));
+      
+      // Request permission for device orientation on iOS/Android if required
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+        (DeviceOrientationEvent as any).requestPermission().catch(console.error);
+      }
     }
   };
 
@@ -190,37 +194,48 @@ export default function TheatrePage() {
           </button>
 
           {isVRMode ? (
-            <div className="w-screen h-screen flex">
-              <div className="w-1/2 h-full relative overflow-hidden border-r border-neutral-900">
-                <Canvas
-                  shadows
-                  camera={{ position: [0, 2, 15], fov: 60 }}
-                  gl={{ antialias: true, powerPreference: 'high-performance' }}
-                >
-                  <Suspense fallback={null}>
-                    <TheatreScene 
-                      isStarted={isStarted} 
-                      initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
-                    />
-                  </Suspense>
-                </Canvas>
+            // VR Mode: Dual Screens (Left Eye & Right Eye) with Device Motion
+            <div className="w-screen h-screen flex bg-black">
+              {/* Left Eye View */}
+              <div className="w-1/2 h-full relative overflow-hidden border-r border-neutral-900 flex items-center justify-center p-2">
+                <div className="w-full h-[85%] rounded-3xl overflow-hidden border border-neutral-800 shadow-2xl bg-black">
+                  <Canvas
+                    shadows
+                    camera={{ position: [0, 2, 15], fov: 60 }}
+                    gl={{ antialias: true, powerPreference: 'high-performance' }}
+                  >
+                    <Suspense fallback={null}>
+                      <DeviceOrientationControls />
+                      <TheatreScene 
+                        isStarted={isStarted} 
+                        initialSeat={selectedSeatPos ? [selectedSeatPos.x - 0.03, 2.3, selectedSeatPos.z + 0.2] : undefined}
+                      />
+                    </Suspense>
+                  </Canvas>
+                </div>
               </div>
-              <div className="w-1/2 h-full relative overflow-hidden">
-                <Canvas
-                  shadows
-                  camera={{ position: [0, 2, 15], fov: 60 }}
-                  gl={{ antialias: true, powerPreference: 'high-performance' }}
-                >
-                  <Suspense fallback={null}>
-                    <TheatreScene 
-                      isStarted={isStarted} 
-                      initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
-                    />
-                  </Suspense>
-                </Canvas>
+
+              {/* Right Eye View */}
+              <div className="w-1/2 h-full relative overflow-hidden flex items-center justify-center p-2">
+                <div className="w-full h-[85%] rounded-3xl overflow-hidden border border-neutral-800 shadow-2xl bg-black">
+                  <Canvas
+                    shadows
+                    camera={{ position: [0, 2, 15], fov: 60 }}
+                    gl={{ antialias: true, powerPreference: 'high-performance' }}
+                  >
+                    <Suspense fallback={null}>
+                      <DeviceOrientationControls />
+                      <TheatreScene 
+                        isStarted={isStarted} 
+                        initialSeat={selectedSeatPos ? [selectedSeatPos.x + 0.03, 2.3, selectedSeatPos.z + 0.2] : undefined}
+                      />
+                    </Suspense>
+                  </Canvas>
+                </div>
               </div>
             </div>
           ) : (
+            // Normal Single Screen Mode
             <Canvas
               shadows
               camera={{ position: [0, 2, 15], fov: 60 }}
