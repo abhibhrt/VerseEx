@@ -235,8 +235,7 @@ export default function TheatrePage() {
               camera={{ position: [0, 2, 15], fov: 60 }}
               gl={{ 
                 antialias: true, 
-                powerPreference: 'high-performance',
-                pixelRatio: window.devicePixelRatio
+                powerPreference: 'high-performance'
               }}
               style={{ 
                 width: '100%', 
