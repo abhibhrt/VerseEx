@@ -49,11 +49,6 @@ export default function Navbar() {
             icon: <PiPlanet className="text-sm" /> 
         },
         { 
-            name: 'Quizzes', 
-            href: '/quizzes', 
-            icon: <FaQuestionCircle className="text-sm" /> 
-        },
-        { 
             name: 'Theatre', 
             href: '/theatre', 
             icon: <FaFilm className="text-sm" /> 

@@ -4,7 +4,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Environment, OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
 import TheatreScreen from './TheatreScreen';
 import TheatreSeats from './TheatreSeats';
 
@@ -22,6 +21,12 @@ export default function TheatreScene({
   const [autoSeated, setAutoSeated] = useState(false);
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
+  const [blink, setBlink] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => setBlink(prev => !prev), 1500);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -78,6 +83,29 @@ export default function TheatreScene({
     }
   };
 
+  // Night vision camera component
+  const NightVisionCamera = ({ x, delay }: { x: number; delay: boolean }) => (
+    <group position={[x, 14, -24]}>
+      <mesh>
+        <cylinderGeometry args={[0.25, 0.3, 0.2, 16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.8} />
+      </mesh>
+      <mesh position={[0, 0, 0.15]}>
+        <circleGeometry args={[0.18, 16]} />
+        <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.9} />
+      </mesh>
+      <mesh position={[delay ? -0.15 : 0.15, 0.1, 0.18]}>
+        <circleGeometry args={[0.04, 8]} />
+        <meshStandardMaterial 
+          color="#ff0000" 
+          emissive="#ff0000" 
+          emissiveIntensity={blink ? 2.0 : 0.1} 
+        />
+      </mesh>
+      {blink && <pointLight position={[0.15, 0.1, 0.3]} intensity={0.3} color="#ff0000" distance={2} />}
+    </group>
+  );
+
   return (
     <>
       <color attach="background" args={['#0a0a0a']} />
@@ -100,21 +128,21 @@ export default function TheatreScene({
       <pointLight position={[-8, 12, 5]} intensity={0.02} color="#ffd700"/>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, -10]} receiveShadow>
-        <planeGeometry args={[40, 35]} />
+        <planeGeometry args={[24, 30]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.95} metalness={0.0} emissive="#0a0a0a" emissiveIntensity={0.2} />
       </mesh>
 
       <mesh position={[0, 7.5, -24.5]} receiveShadow>
-        <planeGeometry args={[40, 15]} />
+        <planeGeometry args={[24, 15]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
 
-      <mesh position={[-20, 7.5, -12]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[25, 15]} />
+      <mesh position={[-12, 7.5, -12]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[34, 15]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
-      <mesh position={[20, 7.5, -12]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[25, 15]} />
+      <mesh position={[12, 7.5, -12]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[34, 15]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
 
@@ -134,18 +162,11 @@ export default function TheatreScene({
         <pointLight key={`steplight-${i}`} position={[0, 0.2, -2 - i * 2.0]} intensity={0.02} color="#ff6600" distance={3} />
       ))}
 
-      {/* Pass isStarted to TheatreScreen */}
       <TheatreScreen isStarted={isStarted} />
       <TheatreSeats onSeatClick={handleSeatClick} selectedSeat={autoSeated ? seatPos : undefined} />
 
-      <mesh position={[18, 7, -20]}>
-        <boxGeometry args={[0.6, 0.3, 0.1]} />
-        <meshStandardMaterial color="#00ff00" emissive="#00ff00" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[-18, 7, -20]}>
-        <boxGeometry args={[0.6, 0.3, 0.1]} />
-        <meshStandardMaterial color="#00ff00" emissive="#00ff00" emissiveIntensity={0.3} />
-      </mesh>
+      <NightVisionCamera x={-6} delay={false} />
+      <NightVisionCamera x={6} delay={true} />
 
       <Environment preset="night" background={false} />
     </>
