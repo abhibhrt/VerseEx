@@ -1,9 +1,10 @@
 // app/theatre/page.tsx
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader } from '@react-three/drei';
+import * as THREE from 'three';
 import TheatreScene from './TheatreScene';
 
 interface Seat {
@@ -24,6 +25,7 @@ export default function TheatrePage() {
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [hoveredSeat, setHoveredSeat] = useState<string | null>(null);
   const [isVR, setIsVR] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Seat layout configuration - 7 rows x 18 seats
   const rows = 7;
@@ -65,11 +67,6 @@ export default function TheatrePage() {
     } else {
       alert('Please select a seat first');
     }
-  };
-
-  // Toggle VR mode while in theatre
-  const toggleVR = () => {
-    setIsVR(!isVR);
   };
 
   // Find selected seat position
@@ -229,21 +226,41 @@ export default function TheatrePage() {
           </div>
         </div>
       ) : (
-        // Theatre Experience
+        // Theatre Experience with VR
         <>
-          <Canvas
-            shadows
-            camera={{ position: [0, 2, 15], fov: 60 }}
-            gl={{ antialias: true, powerPreference: 'high-performance' }}
-          >
-            <Suspense fallback={null}>
-              <TheatreScene 
-                isStarted={isStarted} 
-                initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
-                isVR={isVR}
-              />
-            </Suspense>
-          </Canvas>
+          <div className="relative w-full h-full">
+            <Canvas
+              ref={canvasRef as any}
+              shadows
+              camera={{ position: [0, 2, 15], fov: 60 }}
+              gl={{ 
+                antialias: true, 
+                powerPreference: 'high-performance',
+                pixelRatio: window.devicePixelRatio
+              }}
+              style={{ 
+                width: '100%', 
+                height: '100%',
+                display: 'block'
+              }}
+            >
+              <Suspense fallback={null}>
+                <TheatreScene 
+                  isStarted={isStarted} 
+                  initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
+                  isVR={isVR}
+                />
+              </Suspense>
+            </Canvas>
+
+            {/* VR Overlay - Creates split screen effect */}
+            {isVR && (
+              <div className="absolute inset-0 pointer-events-none z-40">
+                <div className="w-1/2 h-full absolute left-0 top-0 border-r border-white/10"></div>
+                <div className="w-1/2 h-full absolute right-0 top-0 border-l border-white/10"></div>
+              </div>
+            )}
+          </div>
 
           <Loader containerStyles={{ background: '#000' }} innerStyles={{ width: '200px', background: '#333' }} barStyles={{ background: '#dc2626' }} />
           
@@ -251,7 +268,7 @@ export default function TheatrePage() {
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex gap-2">
             {/* Toggle VR Button */}
             <button
-              onClick={toggleVR}
+              onClick={() => setIsVR(!isVR)}
               className={`
                 px-4 py-1.5 rounded-full font-medium text-[11px] uppercase tracking-wider
                 transition-all duration-300 transform hover:scale-105 active:scale-95
@@ -289,12 +306,12 @@ export default function TheatrePage() {
 
           {/* VR Mode Status - Small indicator */}
           {isVR && (
-            <div className="absolute top-3 right-3 z-50 bg-purple-600/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-[10px] font-medium shadow-lg flex items-center gap-1.5">
+            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-50 bg-purple-600/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-[10px] font-medium shadow-lg flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              VR
+              VR Mode Active
             </div>
           )}
         </>

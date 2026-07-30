@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei'; // ✅ Added Environment here
+import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import TheatreScreen from './TheatreScreen';
 import TheatreSeats from './TheatreSeats';
@@ -23,7 +23,7 @@ export default function TheatreScene({
   const [seatPos, setSeatPos] = useState<[number, number, number]>(initialSeat || [0, 0, 0]);
   const [autoSeated, setAutoSeated] = useState(false);
   const controlsRef = useRef<any>(null);
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
 
   // VR-specific camera height adjustment
   const vrHeightOffset = isVR ? -0.2 : 0;
