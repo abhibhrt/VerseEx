@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Environment, OrbitControls } from '@react-three/drei';
+import { OrbitControls, Environment } from '@react-three/drei'; // ✅ Added Environment here
 import * as THREE from 'three';
 import TheatreScreen from './TheatreScreen';
 import TheatreSeats from './TheatreSeats';
@@ -11,17 +11,22 @@ import TheatreSeats from './TheatreSeats';
 interface TheatreSceneProps {
   isStarted: boolean;
   initialSeat?: [number, number, number];
+  isVR?: boolean;
 }
 
 export default function TheatreScene({ 
   isStarted, 
-  initialSeat
+  initialSeat,
+  isVR = false
 }: TheatreSceneProps) {
   const [seated, setSeated] = useState(false);
   const [seatPos, setSeatPos] = useState<[number, number, number]>(initialSeat || [0, 0, 0]);
   const [autoSeated, setAutoSeated] = useState(false);
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
+
+  // VR-specific camera height adjustment
+  const vrHeightOffset = isVR ? -0.2 : 0;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,12 +57,13 @@ export default function TheatreScene({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [initialSeat]);
 
   useFrame(() => {
     if (seated && controlsRef.current) {
-      camera.position.set(seatPos[0], seatPos[1] + 0.9, seatPos[2] + 0.3);
-      controlsRef.current.target.set(seatPos[0], 6.2, -22);
+      const heightOffset = isVR ? 0.7 : 0.9;
+      camera.position.set(seatPos[0], seatPos[1] + heightOffset + vrHeightOffset, seatPos[2] + 0.3);
+      controlsRef.current.target.set(seatPos[0], isVR ? 5.8 : 6.2, -22);
     }
   });
 
@@ -65,8 +71,9 @@ export default function TheatreScene({
     setSeatPos(position);
     setSeated(true);
     if (controlsRef.current) {
-      camera.position.set(position[0], position[1] + 0.9, position[2] + 0.3);
-      controlsRef.current.target.set(position[0], 6.2, -22);
+      const heightOffset = isVR ? 0.7 : 0.9;
+      camera.position.set(position[0], position[1] + heightOffset + vrHeightOffset, position[2] + 0.3);
+      controlsRef.current.target.set(position[0], isVR ? 5.8 : 6.2, -22);
       
       controlsRef.current.enableZoom = false;
       controlsRef.current.enablePan = false;
@@ -85,8 +92,8 @@ export default function TheatreScene({
 
       <OrbitControls
         ref={controlsRef}
-        enablePan={!seated}
-        enableZoom={!seated}
+        enablePan={!seated && !isVR}
+        enableZoom={!seated && !isVR}
         maxPolarAngle={Math.PI / 2 - 0.05}
         minDistance={2}
         maxDistance={30}
@@ -134,7 +141,6 @@ export default function TheatreScene({
         <pointLight key={`steplight-${i}`} position={[0, 0.2, -2 - i * 2.0]} intensity={0.02} color="#ff6600" distance={3} />
       ))}
 
-      {/* Pass isStarted to TheatreScreen */}
       <TheatreScreen isStarted={isStarted} />
       <TheatreSeats onSeatClick={handleSeatClick} selectedSeat={autoSeated ? seatPos : undefined} />
 
