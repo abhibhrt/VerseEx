@@ -42,7 +42,7 @@ export default function VRSideBySide({ children, enabled = true, ipd = 0.064 }: 
     // Get camera right vector for horizontal offset
     const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
 
-    leftCameraRef.current.position.copy(camera.position).subScaledVector(rightVector, halfIPD);
+    leftCameraRef.current.position.copy(camera.position).addScaledVector(rightVector, -halfIPD);
     leftCameraRef.current.quaternion.copy(camera.quaternion);
 
     rightCameraRef.current.position.copy(camera.position).addScaledVector(rightVector, halfIPD);
