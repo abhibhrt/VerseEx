@@ -23,8 +23,10 @@ export default function TheatrePage() {
   const [isStarted, setIsStarted] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [hoveredSeat, setHoveredSeat] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string>('');
 
-  // Seat layout configuration - 7 rows x 18 seats
+  const STREAM_URL = 'wss://screen-share-stream.onrender.com/ws';
+
   const rows = 7;
   const seatsPerRow = 18;
   const seatMap: RowMap[] = [];
@@ -47,7 +49,7 @@ export default function TheatrePage() {
   }
 
   const handleEnterTheatre = () => {
-    if (selectedSeat) {
+    if (selectedSeat && roomId.trim()) {
       setIsStarted(true);
       window.dispatchEvent(new CustomEvent('play-theatre-video'));
     }
@@ -71,7 +73,7 @@ export default function TheatrePage() {
     <main className="relative w-screen h-screen overflow-hidden bg-black select-none">
       {!isStarted ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-black via-[#0a0a0a] to-[#1a0505] p-4">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="text-center mb-4">
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 uppercase mb-2">
                 VerseEx Cinema
@@ -88,7 +90,7 @@ export default function TheatrePage() {
                 <div className="text-center text-neutral-500 text-xs mt-2 tracking-widest uppercase">SCREEN</div>
               </div>
 
-              <div className="flex flex-col items-center gap-1.5 max-h-[400px] overflow-y-auto px-2">
+              <div className="flex flex-col items-center gap-1.5 max-h-[400px] overflow-y-auto p-2">
                 {seatMap.map((row) => (
                   <div key={row.row} className="flex items-center gap-1.5">
                     <span className="text-neutral-500 text-xs font-bold w-4 text-right">{row.row}</span>
@@ -110,9 +112,9 @@ export default function TheatrePage() {
                               flex items-center justify-center text-[6px] md:text-[8px] font-bold
                               ${isAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-30'}
                               ${isSelected 
-                                ? 'bg-gradient-to-br from-red-600 to-rose-600 text-white scale-110 shadow-lg shadow-red-600/50 ring-1 ring-red-500' 
+                                ? 'bg-gradient-to-br from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/50 ring-1 ring-red-500' 
                                 : isHovered && isAvailable
-                                ? 'bg-white/20 text-white scale-105'
+                                ? 'bg-white/20 text-white'
                                 : isAvailable
                                 ? 'bg-white/5 text-neutral-400 hover:bg-white/10'
                                 : 'bg-black/30 text-neutral-600 line-through'
@@ -156,17 +158,29 @@ export default function TheatrePage() {
                       </p>
                     </div>
                   ) : (
-                    <p className="text-neutral-500 text-sm">Please select a seat to continue</p>
+                    <p className="text-neutral-500 text-sm">Enter Room Id and Select Seat</p>
+                  )}
+                  {roomId && (
+                    <p className="text-neutral-500 text-xs mt-1">
+                      Room: <span className="text-amber-400 font-mono">{roomId}</span>
+                    </p>
                   )}
                 </div>
-                
+                 <input
+                  type="text"
+                  value={roomId}
+                  onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                  placeholder="Enter RoomId"
+                  className="py-2 px-3 bg-white/5 border border-white/10 rounded-full text-white placeholder-neutral-500 focus:outline-none focus:border-red-500/50 transition-colors uppercase font-mono tracking-wider"
+                  maxLength={6}
+                />
                 <button
                   onClick={handleEnterTheatre}
-                  disabled={!selectedSeat}
+                  disabled={!selectedSeat || !roomId.trim()}
                   className={`
                     px-8 py-2.5 rounded-full font-medium uppercase tracking-wider text-sm
                     transition-all duration-300 transform
-                    ${selectedSeat 
+                    ${selectedSeat && roomId.trim() 
                       ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 cursor-pointer' 
                       : 'bg-neutral-800 text-neutral-500 cursor-not-allowed opacity-50'
                     }
@@ -179,7 +193,6 @@ export default function TheatrePage() {
           </div>
         </div>
       ) : (
-        // Single Screen Mode (VR removed)
         <Canvas
           shadows
           camera={{ position: [0, 2, 15], fov: 60 }}
@@ -189,6 +202,8 @@ export default function TheatrePage() {
             <TheatreScene 
               isStarted={isStarted} 
               initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
+              streamUrl={STREAM_URL}
+              roomId={roomId}
             />
           </Suspense>
         </Canvas>

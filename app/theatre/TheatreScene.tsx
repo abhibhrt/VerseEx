@@ -10,11 +10,15 @@ import TheatreSeats from './TheatreSeats';
 interface TheatreSceneProps {
   isStarted: boolean;
   initialSeat?: [number, number, number];
+  streamUrl?: string;
+  roomId?: string; // Add roomId prop
 }
 
 export default function TheatreScene({ 
   isStarted, 
-  initialSeat
+  initialSeat,
+  streamUrl,
+  roomId
 }: TheatreSceneProps) {
   const [seated, setSeated] = useState(false);
   const [seatPos, setSeatPos] = useState<[number, number, number]>(initialSeat || [0, 0, 0]);
@@ -162,7 +166,8 @@ export default function TheatreScene({
         <pointLight key={`steplight-${i}`} position={[0, 0.2, -2 - i * 2.0]} intensity={0.02} color="#ff6600" distance={3} />
       ))}
 
-      <TheatreScreen isStarted={isStarted} />
+      {/* Pass roomId to TheatreScreen */}
+      <TheatreScreen isStarted={isStarted} streamUrl={streamUrl} roomId={roomId} />
       <TheatreSeats onSeatClick={handleSeatClick} selectedSeat={autoSeated ? seatPos : undefined} />
 
       <NightVisionCamera x={-6} delay={false} />
