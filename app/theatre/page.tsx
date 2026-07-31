@@ -25,7 +25,8 @@ export default function TheatrePage() {
   const [hoveredSeat, setHoveredSeat] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string>('');
 
-  const STREAM_URL = 'wss://screen-share-stream.onrender.com/ws';
+  // Updated to your new Render deployment URL
+  const STREAM_URL = 'wss://sturdy-goggles-1bnx.onrender.com';
 
   const rows = 7;
   const seatsPerRow = 18;

@@ -11,7 +11,7 @@ interface TheatreSceneProps {
   isStarted: boolean;
   initialSeat?: [number, number, number];
   streamUrl?: string;
-  roomId?: string; // Add roomId prop
+  roomId?: string;
 }
 
 export default function TheatreScene({ 

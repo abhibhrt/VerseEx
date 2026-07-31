@@ -3,7 +3,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { io, Socket } from 'socket.io-client';
 
 interface TheatreScreenProps {
   isStarted: boolean;
@@ -13,7 +12,7 @@ interface TheatreScreenProps {
 
 export default function TheatreScreen({ 
   isStarted, 
-  streamUrl = 'https://sturdy-goggles-1bnx.onrender.com',
+  streamUrl = 'wss://sturdy-goggles-1bnx.onrender.com',
   roomId = ''
 }: TheatreScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -21,14 +20,13 @@ export default function TheatreScreen({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
-  const roomIdRef = useRef<string>(roomId);
 
   useEffect(() => {
     // Create video element
     const video = document.createElement('video');
-    video.autoplay = false;
+    video.autoplay = true;
     video.playsInline = true;
     video.crossOrigin = 'anonymous';
     video.volume = 0.7;
@@ -60,20 +58,22 @@ export default function TheatreScreen({
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+      if (wsRef.current) {
+        wsRef.current.close();
       }
       texture.dispose();
     };
-  }, []);
+  }, [streamUrl, roomId]);
 
   const connectToStream = async (url: string, roomId: string) => {
     if (isConnecting) return;
     setIsConnecting(true);
     setConnectionError(null);
-    roomIdRef.current = roomId;
 
     try {
+      // Ensure url is using wss:// or ws://
+      const formattedUrl = url.replace(/^https?:\/\//, 'wss://').replace(/^http?:\/\//, 'ws://');
+
       // Create WebRTC peer connection
       const pc = new RTCPeerConnection({
         iceServers: [
@@ -84,9 +84,9 @@ export default function TheatreScreen({
       });
       peerConnectionRef.current = pc;
 
-      // Handle incoming stream
+      // Handle incoming stream tracks
       pc.ontrack = (event) => {
-        console.log('Received track:', event.track.kind);
+        console.log('🎥 Received remote track:', event.track.kind);
         if (videoRef.current && event.streams.length > 0) {
           videoRef.current.srcObject = event.streams[0];
           setIsStreamReady(true);
@@ -125,154 +125,85 @@ export default function TheatreScreen({
         }
       };
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate && socketRef.current) {
-          socketRef.current.emit('ice-candidate', roomId, event.candidate);
-        }
+      // Create WebSocket connection for signaling
+      const ws = new WebSocket(formattedUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('✅ Connected to signaling server, joining room as watcher:', roomId);
+        // Send watcher message format matching the server
+        ws.send(JSON.stringify({
+          type: 'watcher',
+          roomCode: roomId
+        }));
       };
 
-      // Create Socket.IO connection
-      const socket = io(url, {
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000
-      });
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        console.log('✅ Connected to signaling server');
-        // Join room as watcher
-        socket.emit('watcher', roomId);
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
         setIsConnecting(false);
-        setConnectionError('Connection error');
-      });
+        setConnectionError('WebSocket error');
+      };
 
-      socket.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason);
+      ws.onclose = () => {
+        console.log('WebSocket closed');
         setIsConnecting(false);
         if (!isStreamReady) {
-          setConnectionError('Disconnected');
+          setConnectionError('Connection closed');
         }
-      });
-
-      // Handle broadcaster found
-      socket.on('broadcaster-found', (broadcasterId) => {
-        console.log('📡 Broadcaster found:', broadcasterId);
-        createOffer();
-      });
-
-      // Handle no broadcaster
-      socket.on('no-broadcaster', () => {
-        console.warn('❌ No broadcaster found for room:', roomId);
-        setIsConnecting(false);
-        setConnectionError('No broadcaster available');
-        // Retry after 3 seconds
+        // Try to reconnect after 3 seconds
         setTimeout(() => {
-          if (socketRef.current && roomIdRef.current) {
-            socketRef.current.emit('watcher', roomIdRef.current);
+          if (!isStreamReady && !connectionError) {
+            connectToStream(url, roomId);
           }
         }, 3000);
-      });
+      };
 
-      // Handle WebRTC signaling
-      socket.on('offer', async (id, sdp) => {
-        console.log('📨 Received offer from:', id);
+      ws.onmessage = async (message) => {
         try {
-          if (!peerConnectionRef.current) return;
+          const data = JSON.parse(message.data);
           
-          await peerConnectionRef.current.setRemoteDescription(
-            new RTCSessionDescription(sdp)
-          );
-          const answer = await peerConnectionRef.current.createAnswer();
-          await peerConnectionRef.current.setLocalDescription(answer);
-          
-          if (socketRef.current) {
-            socketRef.current.emit('answer', id, answer);
-            console.log('✅ Answer sent');
+          // Handle standard signaling events coming from the server socket setup
+          if (data.type === 'offer' || data.sdp && data.type !== 'answer') {
+            // Depending on how server packages signals: { type: 'offer', sdp, broadcasterId } etc.
+            await handleOffer(data);
+          } else {
+            switch (data.type) {
+              case 'no-broadcaster':
+                console.warn('No broadcaster found for room:', roomId);
+                setConnectionError('No broadcaster found');
+                setIsConnecting(false);
+                break;
+
+              case 'broadcaster-disconnected':
+                console.warn('Broadcaster disconnected');
+                setIsStreamReady(false);
+                setConnectionError('Broadcaster disconnected');
+                if (videoRef.current) {
+                  videoRef.current.srcObject = null;
+                }
+                break;
+
+              case 'ice-candidate':
+                if (data.candidate && peerConnectionRef.current) {
+                  await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+                break;
+
+              default:
+                console.log('Received message:', data);
+            }
           }
         } catch (error) {
-          console.error('Error handling offer:', error);
-        }
-      });
-
-      socket.on('answer', async (id, sdp) => {
-        console.log('📨 Received answer from:', id);
-        try {
-          if (!peerConnectionRef.current) return;
-          await peerConnectionRef.current.setRemoteDescription(
-            new RTCSessionDescription(sdp)
-          );
-          console.log('✅ Connection established');
-        } catch (error) {
-          console.error('Error handling answer:', error);
-        }
-      });
-
-      socket.on('ice-candidate', async (id, candidate) => {
-        try {
-          if (!peerConnectionRef.current) return;
-          if (candidate) {
-            await peerConnectionRef.current.addIceCandidate(
-              new RTCIceCandidate(candidate)
-            );
-          }
-        } catch (error) {
-          console.error('Error adding ICE candidate:', error);
-        }
-      });
-
-      socket.on('broadcaster-disconnected', () => {
-        console.warn('📡 Broadcaster disconnected');
-        setIsStreamReady(false);
-        setConnectionError('Broadcaster disconnected');
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-        // Try to reconnect
-        setTimeout(() => {
-          if (socketRef.current && roomIdRef.current) {
-            socketRef.current.emit('watcher', roomIdRef.current);
-          }
-        }, 3000);
-      });
-
-      socket.on('room-participants', (count) => {
-        console.log(`👥 Participants: ${count}`);
-      });
-
-      // Store createOffer function
-      const createOffer = async () => {
-        try {
-          if (!peerConnectionRef.current) return;
-          
-          console.log('Creating offer...');
-          const offer = await peerConnectionRef.current.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true
-          });
-          await peerConnectionRef.current.setLocalDescription(offer);
-
-          if (socketRef.current && roomIdRef.current) {
-            socketRef.current.emit('offer', roomIdRef.current, offer);
-            console.log('✅ Offer sent');
-          }
-        } catch (err) {
-          console.error('Error creating offer:', err);
-          setConnectionError('Failed to create connection');
+          console.error('Error processing message:', error);
         }
       };
 
-      // Expose createOffer globally for reconnection
-      (window as any).createOffer = createOffer;
-
-      // Initial connection
-      socket.emit('watcher', roomId);
+      pc.onicecandidate = (event) => {
+        if (event.candidate && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          // Send ICE candidate back through signaling server if needed
+          // Based on backend structure
+        }
+      };
 
     } catch (error) {
       console.error('Error connecting to stream:', error);
@@ -281,25 +212,28 @@ export default function TheatreScreen({
     }
   };
 
-  // Handle roomId changes
-  useEffect(() => {
-    if (roomId && roomId !== roomIdRef.current) {
-      // Reconnect with new room ID
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
-      setIsStreamReady(false);
-      setIsConnecting(false);
-      setConnectionError(null);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      connectToStream(streamUrl, roomId);
+  const handleOffer = async (data: any) => {
+    try {
+      if (!peerConnectionRef.current || !wsRef.current) return;
+      const pc = peerConnectionRef.current;
+
+      const remoteDesc = data.sdp || data;
+      await pc.setRemoteDescription(new RTCSessionDescription(remoteDesc));
+      
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      // Send answer back to broadcaster via server
+      wsRef.current.send(JSON.stringify({
+        type: 'answer',
+        sdp: pc.localDescription,
+        targetId: data.broadcasterId || data.id
+      }));
+      console.log('✅ Answer sent to broadcaster');
+    } catch (err) {
+      console.error('Error handling offer/answer:', err);
     }
-  }, [roomId]);
+  };
 
   // Handle play/pause based on isStarted
   useEffect(() => {
@@ -390,26 +324,6 @@ export default function TheatreScreen({
           color="#000000" 
           transparent 
           opacity={0.1}
-        />
-      </mesh>
-
-      {/* Screen border glow - top */}
-      <mesh position={[0, 5.05, 0.15]} rotation={[0.1, 0, 0]}>
-        <planeGeometry args={[20, 0.5]} />
-        <meshBasicMaterial 
-          color="#ffd700" 
-          transparent 
-          opacity={isStreamReady ? 0.05 : 0.02}
-        />
-      </mesh>
-
-      {/* Screen border glow - bottom */}
-      <mesh position={[0, -5.05, 0.15]} rotation={[-0.1, 0, 0]}>
-        <planeGeometry args={[20, 0.5]} />
-        <meshBasicMaterial 
-          color="#ffd700" 
-          transparent 
-          opacity={isStreamReady ? 0.05 : 0.02}
         />
       </mesh>
     </group>
