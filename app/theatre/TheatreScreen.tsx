@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { io, Socket } from 'socket.io-client';
 
 interface TheatreScreenProps {
   isStarted: boolean;
@@ -12,7 +13,7 @@ interface TheatreScreenProps {
 
 export default function TheatreScreen({ 
   isStarted, 
-  streamUrl = 'wss://sturdy-goggles-1bnx.onrender.com',
+  streamUrl = 'https://sturdy-goggles-1bnx.onrender.com',
   roomId = ''
 }: TheatreScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -20,7 +21,7 @@ export default function TheatreScreen({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
   useEffect(() => {
@@ -58,180 +59,129 @@ export default function TheatreScreen({
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
-      if (wsRef.current) {
-        wsRef.current.close();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
       texture.dispose();
     };
   }, [streamUrl, roomId]);
 
-  const connectToStream = async (url: string, roomId: string) => {
+  const connectToStream = (url: string, roomCode: string) => {
     if (isConnecting) return;
     setIsConnecting(true);
     setConnectionError(null);
 
     try {
-      // Ensure url is using wss:// or ws://
-      const formattedUrl = url.replace(/^https?:\/\//, 'wss://').replace(/^http?:\/\//, 'ws://');
+      // Clean up URL for Socket.IO (convert wss:// to https:// if needed)
+      const cleanedUrl = url.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://');
 
-      // Create WebRTC peer connection
-      const pc = new RTCPeerConnection({
+      // Initialize Socket.IO connection matching your backend setup
+      const socket = io(cleanedUrl, {
+        transports: ['websocket', 'polling']
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('✅ Connected to Socket.IO signaling server:', socket.id);
+        // Emit watcher event just like your working client.js code
+        socket.emit('watcher', roomCode);
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err);
+        setIsConnecting(false);
+        setConnectionError('Connection failed');
+      });
+
+      socket.on('no-broadcaster', () => {
+        console.warn('No broadcaster found for room:', roomCode);
+        setConnectionError('No broadcaster found');
+        setIsConnecting(false);
+      });
+
+      socket.on('broadcaster-disconnected', () => {
+        console.warn('Broadcaster disconnected');
+        setIsStreamReady(false);
+        setConnectionError('Broadcaster disconnected');
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        if (peerConnectionRef.current) {
+          peerConnectionRef.current.close();
+          peerConnectionRef.current = null;
+        }
+      });
+
+      // STUN configuration
+      const pcConfig = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' }
+          { urls: 'stun:stun1.l.google.com:19302' }
         ]
-      });
-      peerConnectionRef.current = pc;
-
-      // Handle incoming stream tracks
-      pc.ontrack = (event) => {
-        console.log('🎥 Received remote track:', event.track.kind);
-        if (videoRef.current && event.streams.length > 0) {
-          videoRef.current.srcObject = event.streams[0];
-          setIsStreamReady(true);
-          setIsConnecting(false);
-          setConnectionError(null);
-          
-          if (isStarted) {
-            videoRef.current.play().catch(err => {
-              console.warn('Play error:', err);
-              setTimeout(() => {
-                if (videoRef.current) {
-                  videoRef.current.play().catch(() => {});
-                }
-              }, 500);
-            });
-          }
-        }
       };
 
-      pc.oniceconnectionstatechange = () => {
-        const state = pc.iceConnectionState;
-        console.log('ICE connection state:', state);
-        if (state === 'connected') {
-          console.log('✅ Stream connected successfully!');
-          setIsStreamReady(true);
-          setIsConnecting(false);
-          setConnectionError(null);
-        } else if (state === 'failed') {
-          console.warn('ICE connection failed');
-          setIsConnecting(false);
-          setConnectionError('Connection failed');
-        } else if (state === 'disconnected') {
-          console.warn('ICE disconnected');
-          setIsConnecting(false);
-          setConnectionError('Disconnected');
-        }
-      };
-
-      // Create WebSocket connection for signaling
-      const ws = new WebSocket(formattedUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('✅ Connected to signaling server, joining room as watcher:', roomId);
-        // Send watcher message format matching the server
-        ws.send(JSON.stringify({
-          type: 'watcher',
-          roomCode: roomId
-        }));
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setIsConnecting(false);
-        setConnectionError('WebSocket error');
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket closed');
-        setIsConnecting(false);
-        if (!isStreamReady) {
-          setConnectionError('Connection closed');
-        }
-        // Try to reconnect after 3 seconds
-        setTimeout(() => {
-          if (!isStreamReady && !connectionError) {
-            connectToStream(url, roomId);
-          }
-        }, 3000);
-      };
-
-      ws.onmessage = async (message) => {
+      // Handle incoming WebRTC Offer from Broadcaster (matching your working client.js logic)
+      socket.on('offer', async (id: string, desc: RTCSessionDescriptionInit) => {
         try {
-          const data = JSON.parse(message.data);
-          
-          // Handle standard signaling events coming from the server socket setup
-          if (data.type === 'offer' || data.sdp && data.type !== 'answer') {
-            // Depending on how server packages signals: { type: 'offer', sdp, broadcasterId } etc.
-            await handleOffer(data);
-          } else {
-            switch (data.type) {
-              case 'no-broadcaster':
-                console.warn('No broadcaster found for room:', roomId);
-                setConnectionError('No broadcaster found');
-                setIsConnecting(false);
-                break;
-
-              case 'broadcaster-disconnected':
-                console.warn('Broadcaster disconnected');
-                setIsStreamReady(false);
-                setConnectionError('Broadcaster disconnected');
-                if (videoRef.current) {
-                  videoRef.current.srcObject = null;
-                }
-                break;
-
-              case 'ice-candidate':
-                if (data.candidate && peerConnectionRef.current) {
-                  await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-                break;
-
-              default:
-                console.log('Received message:', data);
-            }
+          if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
           }
-        } catch (error) {
-          console.error('Error processing message:', error);
-        }
-      };
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          // Send ICE candidate back through signaling server if needed
-          // Based on backend structure
+          const pc = new RTCPeerConnection(pcConfig);
+          peerConnectionRef.current = pc;
+
+          pc.ontrack = (event) => {
+            console.log('🎥 Received remote track:', event.track.kind);
+            if (videoRef.current && event.streams.length > 0) {
+              videoRef.current.srcObject = event.streams[0];
+              setIsStreamReady(true);
+              setIsConnecting(false);
+              setConnectionError(null);
+              
+              if (isStarted) {
+                videoRef.current.play().catch(err => {
+                  console.warn('Play error:', err);
+                  setTimeout(() => {
+                    if (videoRef.current) {
+                      videoRef.current.play().catch(() => {});
+                    }
+                  }, 500);
+                });
+              }
+            }
+          };
+
+          pc.onicecandidate = (e) => {
+            if (e.candidate && socketRef.current) {
+              socketRef.current.emit('ice-candidate', id, e.candidate);
+            }
+          };
+
+          await pc.setRemoteDescription(new RTCSessionDescription(desc));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          
+          socket.emit('answer', id, pc.localDescription);
+          console.log('✅ Answer sent to broadcaster');
+        } catch (err) {
+          console.error('Error handling offer:', err);
         }
-      };
+      });
+
+      socket.on('ice-candidate', async (id: string, candidate: RTCIceCandidateInit) => {
+        try {
+          if (peerConnectionRef.current && candidate) {
+            await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+        } catch (err) {
+          console.error('Error adding received ice candidate', err);
+        }
+      });
 
     } catch (error) {
       console.error('Error connecting to stream:', error);
       setIsConnecting(false);
       setConnectionError('Connection failed');
-    }
-  };
-
-  const handleOffer = async (data: any) => {
-    try {
-      if (!peerConnectionRef.current || !wsRef.current) return;
-      const pc = peerConnectionRef.current;
-
-      const remoteDesc = data.sdp || data;
-      await pc.setRemoteDescription(new RTCSessionDescription(remoteDesc));
-      
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      // Send answer back to broadcaster via server
-      wsRef.current.send(JSON.stringify({
-        type: 'answer',
-        sdp: pc.localDescription,
-        targetId: data.broadcasterId || data.id
-      }));
-      console.log('✅ Answer sent to broadcaster');
-    } catch (err) {
-      console.error('Error handling offer/answer:', err);
     }
   };
 
