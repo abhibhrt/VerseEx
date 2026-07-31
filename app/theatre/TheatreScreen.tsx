@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { io, Socket } from 'socket.io-client';
 
 interface TheatreScreenProps {
   isStarted: boolean;
@@ -12,7 +13,7 @@ interface TheatreScreenProps {
 
 export default function TheatreScreen({ 
   isStarted, 
-  streamUrl = 'wss://screen-share-stream.onrender.com/ws',
+  streamUrl = 'https://sturdy-goggles-1bnx.onrender.com',
   roomId = ''
 }: TheatreScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -20,8 +21,9 @@ export default function TheatreScreen({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
+  const roomIdRef = useRef<string>(roomId);
 
   useEffect(() => {
     // Create video element
@@ -58,17 +60,18 @@ export default function TheatreScreen({
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
-      if (wsRef.current) {
-        wsRef.current.close();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
       texture.dispose();
     };
-  }, [streamUrl, roomId]);
+  }, []);
 
   const connectToStream = async (url: string, roomId: string) => {
     if (isConnecting) return;
     setIsConnecting(true);
     setConnectionError(null);
+    roomIdRef.current = roomId;
 
     try {
       // Create WebRTC peer connection
@@ -123,104 +126,127 @@ export default function TheatreScreen({
       };
 
       pc.onicecandidate = (event) => {
-        if (event.candidate && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            type: 'signal',
-            signal: { type: 'ice-candidate', candidate: event.candidate }
-          }));
+        if (event.candidate && socketRef.current) {
+          socketRef.current.emit('ice-candidate', roomId, event.candidate);
         }
       };
 
-      // Create WebSocket connection
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
+      // Create Socket.IO connection
+      const socket = io(url, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
+      });
+      socketRef.current = socket;
 
-      ws.onopen = () => {
+      socket.on('connect', () => {
         console.log('✅ Connected to signaling server');
-        // Join room with provided ID
-        ws.send(JSON.stringify({
-          type: 'join-room',
-          roomId: roomId,
-          username: 'Cinema Viewer'
-        }));
-      };
+        // Join room as watcher
+        socket.emit('watcher', roomId);
+      });
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
         setIsConnecting(false);
-        setConnectionError('WebSocket error');
-      };
+        setConnectionError('Connection error');
+      });
 
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+      socket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason);
         setIsConnecting(false);
         if (!isStreamReady) {
-          setConnectionError('Connection closed');
+          setConnectionError('Disconnected');
         }
-        // Try to reconnect after 3 seconds
+      });
+
+      // Handle broadcaster found
+      socket.on('broadcaster-found', (broadcasterId) => {
+        console.log('📡 Broadcaster found:', broadcasterId);
+        createOffer();
+      });
+
+      // Handle no broadcaster
+      socket.on('no-broadcaster', () => {
+        console.warn('❌ No broadcaster found for room:', roomId);
+        setIsConnecting(false);
+        setConnectionError('No broadcaster available');
+        // Retry after 3 seconds
         setTimeout(() => {
-          if (!isStreamReady && !connectionError) {
-            connectToStream(url, roomId);
+          if (socketRef.current && roomIdRef.current) {
+            socketRef.current.emit('watcher', roomIdRef.current);
           }
         }, 3000);
-      };
+      });
 
-      ws.onmessage = async (message) => {
+      // Handle WebRTC signaling
+      socket.on('offer', async (id, sdp) => {
+        console.log('📨 Received offer from:', id);
         try {
-          const data = JSON.parse(message.data);
+          if (!peerConnectionRef.current) return;
           
-          switch (data.type) {
-            case 'room-joined':
-              console.log(`✅ Joined room: ${data.roomId}`);
-              console.log(`👁️ Viewers: ${data.viewerCount}`);
-              await createOffer();
-              break;
-
-            case 'broadcaster-ready':
-              console.log('📡 Broadcaster is ready');
-              await createOffer();
-              break;
-
-            case 'signal':
-              await handleSignal(data.signal);
-              break;
-
-            case 'viewer-count':
-              console.log(`👁️ Viewers: ${data.count}`);
-              break;
-
-            case 'broadcaster-disconnected':
-              console.warn('Broadcaster disconnected');
-              setIsStreamReady(false);
-              setConnectionError('Broadcaster disconnected');
-              if (videoRef.current) {
-                videoRef.current.srcObject = null;
-              }
-              // Try to reconnect
-              setTimeout(() => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  createOffer();
-                }
-              }, 3000);
-              break;
-
-            case 'error':
-              console.error('Server error:', data.message);
-              setConnectionError(data.message);
-              setIsConnecting(false);
-              if (data.message.includes('Room not found')) {
-                console.error(`❌ Room ${roomId} not found`);
-              }
-              break;
-
-            default:
-              console.log('Unknown message type:', data.type);
+          await peerConnectionRef.current.setRemoteDescription(
+            new RTCSessionDescription(sdp)
+          );
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+          
+          if (socketRef.current) {
+            socketRef.current.emit('answer', id, answer);
+            console.log('✅ Answer sent');
           }
         } catch (error) {
-          console.error('Error processing message:', error);
+          console.error('Error handling offer:', error);
         }
-      };
+      });
 
+      socket.on('answer', async (id, sdp) => {
+        console.log('📨 Received answer from:', id);
+        try {
+          if (!peerConnectionRef.current) return;
+          await peerConnectionRef.current.setRemoteDescription(
+            new RTCSessionDescription(sdp)
+          );
+          console.log('✅ Connection established');
+        } catch (error) {
+          console.error('Error handling answer:', error);
+        }
+      });
+
+      socket.on('ice-candidate', async (id, candidate) => {
+        try {
+          if (!peerConnectionRef.current) return;
+          if (candidate) {
+            await peerConnectionRef.current.addIceCandidate(
+              new RTCIceCandidate(candidate)
+            );
+          }
+        } catch (error) {
+          console.error('Error adding ICE candidate:', error);
+        }
+      });
+
+      socket.on('broadcaster-disconnected', () => {
+        console.warn('📡 Broadcaster disconnected');
+        setIsStreamReady(false);
+        setConnectionError('Broadcaster disconnected');
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        // Try to reconnect
+        setTimeout(() => {
+          if (socketRef.current && roomIdRef.current) {
+            socketRef.current.emit('watcher', roomIdRef.current);
+          }
+        }, 3000);
+      });
+
+      socket.on('room-participants', (count) => {
+        console.log(`👥 Participants: ${count}`);
+      });
+
+      // Store createOffer function
       const createOffer = async () => {
         try {
           if (!peerConnectionRef.current) return;
@@ -232,11 +258,8 @@ export default function TheatreScreen({
           });
           await peerConnectionRef.current.setLocalDescription(offer);
 
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({
-              type: 'signal',
-              signal: offer
-            }));
+          if (socketRef.current && roomIdRef.current) {
+            socketRef.current.emit('offer', roomIdRef.current, offer);
             console.log('✅ Offer sent');
           }
         } catch (err) {
@@ -245,8 +268,11 @@ export default function TheatreScreen({
         }
       };
 
-      // Store createOffer function for later use
+      // Expose createOffer globally for reconnection
       (window as any).createOffer = createOffer;
+
+      // Initial connection
+      socket.emit('watcher', roomId);
 
     } catch (error) {
       console.error('Error connecting to stream:', error);
@@ -255,37 +281,25 @@ export default function TheatreScreen({
     }
   };
 
-  const handleSignal = async (signal: any) => {
-    try {
-      if (!peerConnectionRef.current) return;
-
-      if (signal.type === 'offer') {
-        await peerConnectionRef.current.setRemoteDescription(
-          new RTCSessionDescription(signal)
-        );
-        const answer = await peerConnectionRef.current.createAnswer();
-        await peerConnectionRef.current.setLocalDescription(answer);
-        
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            type: 'signal',
-            signal: answer
-          }));
-        }
-      } else if (signal.type === 'answer') {
-        await peerConnectionRef.current.setRemoteDescription(
-          new RTCSessionDescription(signal)
-        );
-        console.log('✅ Connection established with broadcaster');
-      } else if (signal.type === 'ice-candidate' && signal.candidate) {
-        await peerConnectionRef.current.addIceCandidate(
-          new RTCIceCandidate(signal.candidate)
-        );
+  // Handle roomId changes
+  useEffect(() => {
+    if (roomId && roomId !== roomIdRef.current) {
+      // Reconnect with new room ID
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
-    } catch (error) {
-      console.error('Error handling signal:', error);
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
+      setIsStreamReady(false);
+      setIsConnecting(false);
+      setConnectionError(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      connectToStream(streamUrl, roomId);
     }
-  };
+  }, [roomId]);
 
   // Handle play/pause based on isStarted
   useEffect(() => {
