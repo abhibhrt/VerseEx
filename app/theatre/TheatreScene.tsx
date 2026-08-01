@@ -25,12 +25,6 @@ export default function TheatreScene({
   const [autoSeated, setAutoSeated] = useState(false);
   const controlsRef = useRef<any>(null);
   const { camera } = useThree();
-  const [blink, setBlink] = useState(true);
-
-  useEffect(() => {
-    const interval = setInterval(() => setBlink(prev => !prev), 1500);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,7 +101,7 @@ export default function TheatreScene({
 
   return (
     <>
-      <color attach="background" args={['#0a0a0a']} />
+      <color attach="background" args={['#001006']} />
       <fog attach="fog" args={['#0a0a0a', 25, 45]} />
 
       <OrbitControls
@@ -132,13 +126,13 @@ export default function TheatreScene({
         <meshStandardMaterial color="#0d0d0d" roughness={0.95} metalness={0.0} emissive="#0a0a0a" emissiveIntensity={0.2} />
       </mesh>
       {/* Roof  */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 18, -12]} receiveShadow>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 18.05, -12]} receiveShadow>
         <planeGeometry args={[24, 34]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.95} metalness={0.0} emissive="#0a0a0a" emissiveIntensity={0.2} />
       </mesh>
       {/* Front Wall  */}
       <mesh position={[0, 9, -29]} receiveShadow>
-        <planeGeometry args={[24, 18]} />
+        <planeGeometry args={[23.9, 18]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
       {/* Left Wall  */}

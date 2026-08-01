@@ -202,7 +202,7 @@ export default function TheatrePage() {
         >
           <Suspense fallback={null}>
             <TheatreScene 
-              isStarted={isStarted} 
+              isStarted={isStarted}
               initialSeat={selectedSeatPos ? [selectedSeatPos.x, 2.3, selectedSeatPos.z + 0.2] : undefined}
               streamUrl={STREAM_URL}
               roomId={roomId}
