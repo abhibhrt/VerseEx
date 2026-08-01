@@ -216,7 +216,7 @@ export default function TheatreScreen({
   }, [isStarted]);
 
   return (
-    <group position={[0, 7.5, -23.5]}>
+    <group position={[0, 8, -28.5]}>
       {/* Screen Frame - Outer border */}
       <mesh position={[0, 0, 0]} castShadow receiveShadow>
         <boxGeometry args={[21, 10, 0.5]} />
@@ -268,7 +268,7 @@ export default function TheatreScreen({
       </mesh>
 
       {/* Screen dark overlay for cinema feel */}
-      <mesh position={[0, 0, 0.28]}>
+      <mesh position={[0, 0, 0.285]}>
         <planeGeometry args={[21, 10]} />
         <meshBasicMaterial 
           color="#000000" 

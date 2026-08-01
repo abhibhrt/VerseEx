@@ -198,6 +198,7 @@ export default function TheatrePage() {
           shadows
           camera={{ position: [0, 2, 15], fov: 60 }}
           gl={{ antialias: true, powerPreference: 'high-performance' }}
+          className='z-101'
         >
           <Suspense fallback={null}>
             <TheatreScene 

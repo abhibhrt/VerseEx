@@ -65,7 +65,7 @@ export default function Navbar() {
 
     return (
         <nav
-            className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 px-6 lg:px-12 py-3 flex items-center justify-between ${
+            className={`fixed top-0 left-0 w-full z-100 transition-all duration-500 px-6 lg:px-12 py-3 flex items-center justify-between ${
                 scrolled
                     ? 'bg-[#0a0618]/95 backdrop-blur-2xl border-b border-cyan-500/20 shadow-[0_8px_32px_0_rgba(14,116,144,0.3)]'
                     : 'bg-gradient-to-b from-black/80 to-transparent'

@@ -14,8 +14,8 @@ interface TheatreSceneProps {
   roomId?: string;
 }
 
-export default function TheatreScene({ 
-  isStarted, 
+export default function TheatreScene({
+  isStarted,
   initialSeat,
   streamUrl,
   roomId
@@ -76,10 +76,10 @@ export default function TheatreScene({
     if (controlsRef.current) {
       camera.position.set(position[0], position[1] + 0.9, position[2] + 0.3);
       controlsRef.current.target.set(position[0], 6.2, -22);
-      
+
       controlsRef.current.enableZoom = false;
       controlsRef.current.enablePan = false;
-      
+
       controlsRef.current.minAzimuthAngle = -0.5;
       controlsRef.current.maxAzimuthAngle = 0.5;
       controlsRef.current.minPolarAngle = Math.PI / 2 - 0.3;
@@ -88,25 +88,20 @@ export default function TheatreScene({
   };
 
   // Night vision camera component
-  const NightVisionCamera = ({ x, delay }: { x: number; delay: boolean }) => (
-    <group position={[x, 14, -24]}>
-      <mesh>
-        <cylinderGeometry args={[0.25, 0.3, 0.2, 16]} />
+  const NightVisionCamera = ({ x }: { x: number }) => (
+    <group position={[x, 14.5, -29]} >
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.25, 0.25, 0.2, 19]} />
         <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.8} />
       </mesh>
-      <mesh position={[0, 0, 0.15]}>
-        <circleGeometry args={[0.18, 16]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.9} />
-      </mesh>
-      <mesh position={[delay ? -0.15 : 0.15, 0.1, 0.18]}>
-        <circleGeometry args={[0.04, 8]} />
-        <meshStandardMaterial 
-          color="#ff0000" 
-          emissive="#ff0000" 
-          emissiveIntensity={blink ? 2.0 : 0.1} 
+      <mesh position={[0, 0, 0.1]}>
+        <ringGeometry args={[0.2, 0.22, 100]} />
+        <meshStandardMaterial
+          color="#ff0000"
+          emissive="#ff0000"
+          emissiveIntensity={1}
         />
       </mesh>
-      {blink && <pointLight position={[0.15, 0.1, 0.3]} intensity={0.3} color="#ff0000" distance={2} />}
     </group>
   );
 
@@ -129,33 +124,33 @@ export default function TheatreScene({
       <ambientLight intensity={0.02} />
       <pointLight position={[0, 12, 5]} intensity={0.03} color="#ffd700" />
       <pointLight position={[8, 12, 5]} intensity={0.02} color="#ffd700" />
-      <pointLight position={[-8, 12, 5]} intensity={0.02} color="#ffd700"/>
+      <pointLight position={[-8, 12, 5]} intensity={0.02} color="#ffd700" />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, -10]} receiveShadow>
-        <planeGeometry args={[24, 30]} />
+      {/* Floore  */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, -12]} receiveShadow>
+        <planeGeometry args={[24, 34]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.95} metalness={0.0} emissive="#0a0a0a" emissiveIntensity={0.2} />
       </mesh>
-
-      <mesh position={[0, 7.5, -24.5]} receiveShadow>
-        <planeGeometry args={[24, 15]} />
+      {/* Roof  */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 18, -12]} receiveShadow>
+        <planeGeometry args={[24, 34]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.95} metalness={0.0} emissive="#0a0a0a" emissiveIntensity={0.2} />
+      </mesh>
+      {/* Front Wall  */}
+      <mesh position={[0, 9, -29]} receiveShadow>
+        <planeGeometry args={[24, 18]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
-
-      <mesh position={[-12, 7.5, -12]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[34, 15]} />
+      {/* Left Wall  */}
+      <mesh position={[-12, 9, -12]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[34, 18]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
-      <mesh position={[12, 7.5, -12]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[34, 15]} />
+      {/* Right Wall  */}
+      <mesh position={[12, 9, -12]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[34, 18]} />
         <meshStandardMaterial color="#0d0d0d" roughness={0.9} metalness={0.1} />
       </mesh>
-
-      {Array.from({ length: 14 }).map((_, i) => (
-        <mesh key={`panel-${i}`} position={[-18.5, 2 + i * 1.0, -5 - i * 1.2]} rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[0.8, 0.8]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-        </mesh>
-      ))}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -8]}>
         <planeGeometry args={[3, 18]} />
@@ -170,8 +165,8 @@ export default function TheatreScene({
       <TheatreScreen isStarted={isStarted} streamUrl={streamUrl} roomId={roomId} />
       <TheatreSeats onSeatClick={handleSeatClick} selectedSeat={autoSeated ? seatPos : undefined} />
 
-      <NightVisionCamera x={-6} delay={false} />
-      <NightVisionCamera x={6} delay={true} />
+      <NightVisionCamera x={-6} />
+      <NightVisionCamera x={6} />
 
       <Environment preset="night" background={false} />
     </>
