@@ -44,23 +44,36 @@ export default function Home() {
     };
   }, [data]);
 
+  // const SHORT_IDS = [
+  //   '95E1iy6m3RI',
+  //   'viRL9A6ofbQ',
+  //   'hqyRrUdli_c',
+  //   'xVzLeCutrEQ',
+  //   'OSbBk9_vMxQ',
+  //   'Xl3nXBUT-Ts',
+  //   'epDmSjaGbNc',
+  //   'Fry4X0IbT7Y',
+  //   'KSNJFfuC1Io',
+  //   '6_xabM3SYS8',
+  //   'DMTPMkdxpHw',
+  //   '-lQ6ZG-sw2U',
+  //   'bYCDkHGmAKg',
+  //   'Pg5TBA9RoM8',
+  //   '-51caHv58kg'
+  // ];
+
   const SHORT_IDS = [
-    '95E1iy6m3RI',
-    'viRL9A6ofbQ',
-    'hqyRrUdli_c',
-    'xVzLeCutrEQ',
-    'OSbBk9_vMxQ',
-    'Xl3nXBUT-Ts',
-    'epDmSjaGbNc',
-    'Fry4X0IbT7Y',
-    'KSNJFfuC1Io',
-    '6_xabM3SYS8',
-    'DMTPMkdxpHw',
-    '-lQ6ZG-sw2U',
-    'bYCDkHGmAKg',
-    'Pg5TBA9RoM8',
-    '-51caHv58kg'
-  ];
+    "7nNoAaeZQoI", // The Scariest Fact About Space (AstroKobi)
+    "MseiEBDkT1k", // Moon Orbit 3D Animation & NASA
+    "Oo51KBdURMo", // Sound of Space Rocks Crashing into Mars (CBS News)
+    "qRGYAQUOKcE", // Why Spacesuits Are White & Orange (Zack D. Films)
+    "UseiuTXcJNk", // Physics of Water in Zero-G Space (Canadian Space Agency)
+    "v_CplxH66zw", // Fastest Spinning Celestial Body (Neutron Star / Pulsar)
+    "IhznLlkj2VY", // Zooming into Sagittarius A* Supermassive Black Hole
+    "RtMPjWT7Exc", // Largest Known Black Hole vs Solar System Scale
+    "oA274dccp0w", // Gravitational Lensing & Light Bending Around Black Holes
+    "F49Fp1fuGL4", // Cosmic Scale Comparison & Black Hole Simulation
+  ]
 
   return (
     <main className="relative flex h-screen w-full flex-col items-center justify-evenly overflow-hidden bg-[#01030d] bg-[url('/bg.jpg')] bg-cover bg-center bg-no-repeat md:flex-row md:justify-around">
