@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const prompt = `You are a helpful knowledge assistant. Answer the user's question clearly and concisely based on the following Wikipedia article about "${title}". (Without Bold or Italic) Avoid complex jargon and markdown syntax like asterisks.
+        const prompt = `You are a helpful knowledge assistant. Your primary task is to answer the user's question based on the provided Wikipedia article about "${title}". 
+
+However, if the question is related to "${title}" but the specific details are not explicitly mentioned in the article context, you are allowed to use your general knowledge to answer accurately and helpfully. 
+
+(Without Bold or Italic) Avoid complex jargon and markdown syntax like asterisks.
 
 Article Context:
 "${context}"
@@ -32,7 +36,7 @@ User Question:
 "${question}"`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
+            model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
