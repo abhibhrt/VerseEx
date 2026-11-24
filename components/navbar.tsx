@@ -10,6 +10,7 @@ import {
   FaTimes,
   FaHome,
   FaFilm,
+  FaGamepad
 } from 'react-icons/fa';
 import { 
   PiPlanet, 
@@ -63,6 +64,11 @@ export default function Navbar() {
             name: 'Theatre', 
             href: '/theatre', 
             icon: <FaFilm className="text-sm" /> 
+        },
+        { 
+            name: 'Games', 
+            href: '/games', 
+            icon: <FaGamepad className="text-sm" /> 
         }
     ];
 
