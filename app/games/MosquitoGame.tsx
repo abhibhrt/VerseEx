@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -251,7 +252,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
 
     let animationFrameId: number;
 
-        const spawnMosquito = () => {
+    const spawnMosquito = () => {
       const { width, height } = dimensionsRef.current;
       const playerX = width / 2;
       const playerY = height - 85;
@@ -275,7 +276,8 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
       const speed = 1.6 + Math.random() * 1.1 + scoreRef.current * 0.002;
 
       mosquitoSpawnCountRef.current += 1;
-          
+      // Play once every 2 mosquitoes, alternating arrive1 & arrive2:
+      // 2nd -> onarrive1.mp3, 4th -> oarrive2.mp3, 6th -> onarrive1.mp3, 8th -> oarrive2.mp3
       if (mosquitoSpawnCountRef.current % 2 === 0) {
         const arriveSound =
           (mosquitoSpawnCountRef.current / 2) % 2 === 1
@@ -293,8 +295,6 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
         radius: 18,
         wobbleOffset: Math.random() * Math.PI * 2,
       });
-    };
-
     };
 
     const createSplash = (x: number, y: number, color: string) => {
@@ -454,8 +454,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
       ctx.beginPath();
       ctx.roundRect(playerX - pillowW / 2, playerY - 45, pillowW, 42, 14);
       ctx.fill();
-
-      // 3. Man's Pajama Shoulders & Blanket
+// 3. Man's Pajama Shoulders & Blanket
       ctx.fillStyle = '#334155';
       ctx.beginPath();
       ctx.roundRect(playerX - 46, playerY - 8, 92, 35, 16);
@@ -728,7 +727,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
     return () => cancelAnimationFrame(animationFrameId);
   }, [gameOver]);
 
-  return (
+return (
     <div
       ref={containerRef}
       className={
