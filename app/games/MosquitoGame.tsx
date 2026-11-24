@@ -9,7 +9,11 @@ import {
   FaHeart,
   FaStar,
   FaRedo,
+  FaSignOutAlt,
 } from 'react-icons/fa';
+
+const MEDIA_BASE =
+  'https://raw.githubusercontent.com/abhibhrt/VerseEx-Media/main/Mosquito-Killer';
 
 type Bullet = {
   x: number;
@@ -37,7 +41,11 @@ type Particle = {
   color: string;
 };
 
-export default function MosquitoGame() {
+type MosquitoGameProps = {
+  onExit: () => void;
+};
+
+export default function MosquitoGame({ onExit }: MosquitoGameProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -77,14 +85,16 @@ export default function MosquitoGame() {
     return () => clearTimeout(timer);
   }, [score]);
 
-  // Preload .png images
+  // Preload .png images from GitHub
   useEffect(() => {
     const imgAim = new Image();
-    imgAim.src = '/media/onaim.png';
+    imgAim.crossOrigin = 'anonymous';
+    imgAim.src = `${MEDIA_BASE}/onaim.png`;
     imgAimRef.current = imgAim;
 
     const imgBite = new Image();
-    imgBite.src = '/media/onbite.png';
+    imgBite.crossOrigin = 'anonymous';
+    imgBite.src = `${MEDIA_BASE}/onbite.png`;
     imgBiteRef.current = imgBite;
   }, []);
 
@@ -143,6 +153,17 @@ export default function MosquitoGame() {
     }
   };
 
+  const handleExitGame = async () => {
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // Ignore exit error
+      }
+    }
+    onExit();
+  };
+
   const toggleMute = () => {
     setIsMuted((prev) => {
       isMutedRef.current = !prev;
@@ -150,10 +171,10 @@ export default function MosquitoGame() {
     });
   };
 
-  const playSound = (src: string, volume = 0.7) => {
+  const playSound = (fileName: string, volume = 0.7) => {
     if (isMutedRef.current) return;
     try {
-      const audio = new Audio(src);
+      const audio = new Audio(`${MEDIA_BASE}/${fileName}`);
       audio.volume = volume;
       audio.play().catch(() => {});
     } catch (err) {
@@ -197,7 +218,7 @@ export default function MosquitoGame() {
     mouseRef.current = { x: targetX, y: targetY };
 
     triggerReaction('aim', 25);
-    playSound('/media/onshoot.mp3', 0.6);
+    playSound('onshoot.mp3', 0.6);
 
     const { width, height } = dimensionsRef.current;
     const playerX = width / 2;
@@ -255,9 +276,7 @@ export default function MosquitoGame() {
 
       mosquitoSpawnCountRef.current += 1;
       const arriveSound =
-        mosquitoSpawnCountRef.current % 2 === 1
-          ? '/media/onarrive1.mp3'
-          : '/media/oarrive2.mp3';
+        mosquitoSpawnCountRef.current % 2 === 1 ? 'onarrive1.mp3' : 'oarrive2.mp3';
       playSound(arriveSound, 0.5);
 
       mosquitoesRef.current.push({
@@ -621,7 +640,7 @@ export default function MosquitoGame() {
         const isInside = b.x > 0 && b.x < width && b.y > 0 && b.y < height;
 
         if (!isInside) {
-          playSound('/media/onmiss.mp3', 0.5);
+          playSound('onmiss.mp3', 0.5);
           return false;
         }
 
@@ -663,7 +682,7 @@ export default function MosquitoGame() {
         const distToPlayer = Math.hypot(m.x - playerX, m.y - (playerY - 20));
         if (distToPlayer < 48) {
           triggerReaction('bite', 45);
-          playSound('/media/onbite.mp3', 0.8);
+          playSound('onbite.mp3', 0.8);
           healthRef.current = Math.max(0, healthRef.current - 15);
           setHealth(healthRef.current);
           createSplash(playerX, playerY - 20, '#dc2626');
@@ -719,23 +738,35 @@ export default function MosquitoGame() {
             : 'w-full max-w-[800px] rounded-t-xl border border-b-0'
         }`}
       >
-        {/* Animated Score Counter */}
-        <div className="flex items-center gap-1.5 text-sm sm:text-xl font-bold text-yellow-400 shrink-0">
-          <FaStar className="text-yellow-400 text-xs sm:text-base" />
-          <span>Score:</span>
-          <span
-            className={`inline-block transition-all duration-200 origin-left ${
-              scorePop
-                ? 'scale-125 text-white drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]'
-                : 'scale-100 text-yellow-400'
-            }`}
+        {/* Left: Exit Game Button + Score Counter */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            onClick={handleExitGame}
+            aria-label="Exit Game"
+            title="Exit to Game Menu"
+            className="cursor-pointer h-9 px-2.5 sm:px-3 flex items-center justify-center gap-1.5 bg-rose-600/20 hover:bg-rose-600/35 active:scale-95 border border-rose-500/40 rounded-lg text-xs sm:text-sm font-bold text-rose-300 transition"
           >
-            {score}
-          </span>
+            <FaSignOutAlt className="rotate-180" />
+            <span className="hidden sm:inline">Exit</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 text-sm sm:text-xl font-bold text-yellow-400">
+            <FaStar className="text-yellow-400 text-xs sm:text-base" />
+            <span className="hidden xs:inline">Score:</span>
+            <span
+              className={`inline-block transition-all duration-200 origin-left ${
+                scorePop
+                  ? 'scale-125 text-white drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]'
+                  : 'scale-100 text-yellow-400'
+              }`}
+            >
+              {score}
+            </span>
+          </div>
         </div>
 
         {/* Attractive Health Bar */}
-        <div className="flex items-center gap-2 flex-1 max-w-[240px] mx-2">
+        <div className="flex items-center gap-2 flex-1 max-w-[220px] mx-1 sm:mx-2">
           <FaHeart
             className={`text-sm sm:text-base shrink-0 transition-transform ${
               health > 50
@@ -756,7 +787,6 @@ export default function MosquitoGame() {
               }`}
               style={{ width: `${health}%` }}
             >
-              {/* Glossy top highlight */}
               <div className="absolute inset-x-0 top-0 h-1/2 bg-white/25 rounded-full" />
             </div>
           </div>
@@ -817,13 +847,22 @@ export default function MosquitoGame() {
               Final Score:{' '}
               <span className="font-bold text-yellow-400">{score}</span>
             </p>
-            <button
-              onClick={resetGame}
-              className="cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition flex items-center gap-2"
-            >
-              <FaRedo />
-              <span>Try Sleeping Again</span>
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={resetGame}
+                className="cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition flex items-center gap-2"
+              >
+                <FaRedo />
+                <span>Try Sleeping Again</span>
+              </button>
+              <button
+                onClick={handleExitGame}
+                className="cursor-pointer px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition flex items-center gap-2"
+              >
+                <FaSignOutAlt className="rotate-180" />
+                <span>Exit Game</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
