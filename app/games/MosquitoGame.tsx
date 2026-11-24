@@ -1,6 +1,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  FaVolumeUp,
+  FaVolumeMute,
+  FaExpand,
+  FaCompress,
+  FaHeart,
+  FaStar,
+  FaRedo,
+} from 'react-icons/fa';
 
 type Bullet = {
   x: number;
@@ -33,6 +42,7 @@ export default function MosquitoGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [score, setScore] = useState(0);
+  const [scorePop, setScorePop] = useState(false);
   const [health, setHealth] = useState(100);
   const [gameOver, setGameOver] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -59,6 +69,14 @@ export default function MosquitoGame() {
   const mosquitoSpawnCountRef = useRef(0);
   const isMutedRef = useRef(false);
 
+  // Trigger pop animation whenever score increases
+  useEffect(() => {
+    if (score === 0) return;
+    setScorePop(true);
+    const timer = setTimeout(() => setScorePop(false), 180);
+    return () => clearTimeout(timer);
+  }, [score]);
+
   // Preload .png images
   useEffect(() => {
     const imgAim = new Image();
@@ -70,7 +88,7 @@ export default function MosquitoGame() {
     imgBiteRef.current = imgBite;
   }, []);
 
-  // Match canvas internal resolution to actual container aspect ratio (fixes mobile portrait squish)
+  // Match canvas internal resolution to actual container aspect ratio
   useEffect(() => {
     const updateCanvasResolution = () => {
       const canvas = canvasRef.current;
@@ -79,16 +97,13 @@ export default function MosquitoGame() {
       if (rect.width === 0 || rect.height === 0) return;
 
       const aspect = rect.width / rect.height;
-      // Keep a consistent logical height/width scale while matching screen shape
       if (aspect < 1) {
-        // Mobile Portrait
         const logicalWidth = 480;
         const logicalHeight = Math.round(logicalWidth / aspect);
         canvas.width = logicalWidth;
         canvas.height = logicalHeight;
         dimensionsRef.current = { width: logicalWidth, height: logicalHeight };
       } else {
-        // Desktop or Mobile Landscape
         const logicalHeight = 500;
         const logicalWidth = Math.round(logicalHeight * aspect);
         canvas.width = logicalWidth;
@@ -102,7 +117,7 @@ export default function MosquitoGame() {
     return () => window.removeEventListener('resize', updateCanvasResolution);
   }, [isFullscreen]);
 
-  // Sync native fullscreen exit (Esc key / system back gesture)
+  // Sync native fullscreen exit
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
@@ -113,7 +128,6 @@ export default function MosquitoGame() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Hybrid Fullscreen: uses Native API + CSS fixed-inset fallback (works on iOS Safari too!)
   const toggleFullscreen = async () => {
     const nextState = !isFullscreen;
     setIsFullscreen(nextState);
@@ -125,7 +139,7 @@ export default function MosquitoGame() {
         await document.exitFullscreen?.();
       }
     } catch {
-      // iOS Safari throws here—CSS fixed fullscreen state still fills 100% of screen!
+      // CSS fixed fullscreen fallback handles mobile Safari
     }
   };
 
@@ -187,14 +201,16 @@ export default function MosquitoGame() {
 
     const { width, height } = dimensionsRef.current;
     const playerX = width / 2;
-    const gunOriginY = height - 90;
+    const playerY = height - 85;
+    const gunOriginX = playerX;
+    const gunOriginY = playerY + 26;
 
-    const angle = Math.atan2(targetY - gunOriginY, targetX - playerX);
+    const angle = Math.atan2(targetY - gunOriginY, targetX - gunOriginX);
     const speed = 13;
 
     bulletsRef.current.push({
-      x: playerX + Math.cos(angle) * 35,
-      y: gunOriginY + Math.sin(angle) * 35,
+      x: gunOriginX + Math.cos(angle) * 38,
+      y: gunOriginY + Math.sin(angle) * 38,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
     });
@@ -437,79 +453,138 @@ export default function MosquitoGame() {
       // 4. Man's Face (.png)
       const faceImg =
         currentFaceRef.current === 'bite' ? imgBiteRef.current : imgAimRef.current;
-      const faceRadius = 30;
-      const faceY = playerY - 26;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(playerX, faceY, faceRadius, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
+      const faceSize = 68;
+      const faceX = playerX - faceSize / 2;
+      const faceY = playerY - 62;
 
       if (faceImg && faceImg.complete && faceImg.naturalWidth > 0) {
+        const imgAspect = faceImg.naturalWidth / faceImg.naturalHeight;
+        let drawW = faceSize;
+        let drawH = faceSize;
+        if (imgAspect > 1) {
+          drawH = faceSize / imgAspect;
+        } else {
+          drawW = faceSize * imgAspect;
+        }
         ctx.drawImage(
           faceImg,
-          playerX - faceRadius,
-          faceY - faceRadius,
-          faceRadius * 2,
-          faceRadius * 2
+          playerX - drawW / 2,
+          faceY + (faceSize - drawH) / 2,
+          drawW,
+          drawH
         );
       } else {
         ctx.fillStyle = '#fed7aa';
-        ctx.fillRect(playerX - faceRadius, faceY - faceRadius, faceRadius * 2, faceRadius * 2);
+        ctx.fillRect(faceX, faceY, faceSize, faceSize);
       }
-      ctx.restore();
-
-      ctx.strokeStyle = currentFaceRef.current === 'bite' ? '#ef4444' : '#38bdf8';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(playerX, faceY, faceRadius, 0, Math.PI * 2);
-      ctx.stroke();
 
       if (currentFaceRef.current === 'bite' && reactionTimerRef.current > 0) {
         ctx.fillStyle = '#ef4444';
         ctx.font = 'bold 18px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('OUCH! BITTEN!', playerX, faceY - 40);
+        ctx.fillText('OUCH! BITTEN!', playerX, faceY - 8);
       }
 
-      // 5. Aiming Arm, Blaster & Laser
-      const gunOriginY = playerY - 6;
+      // 5. Black Blaster + Man's Arm & Hand Holding the Shooter
+      const gunOriginX = playerX;
+      const gunOriginY = playerY + 26;
+      const shoulderX = playerX + 36;
+      const shoulderY = playerY + 6;
+
       const aimAngle = Math.atan2(
         mouseRef.current.y - gunOriginY,
-        mouseRef.current.x - playerX
+        mouseRef.current.x - gunOriginX
       );
 
+      // Laser sight beam from blaster nozzle
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.moveTo(playerX, gunOriginY);
+      ctx.moveTo(gunOriginX, gunOriginY);
       ctx.lineTo(mouseRef.current.x, mouseRef.current.y);
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Draw Man's Right Arm reaching from shoulder down to hold the shooter grip
+      const elbowX = shoulderX + 12;
+      const elbowY = shoulderY + 16;
+
+      // Upper arm (pajama sleeve)
+      ctx.strokeStyle = '#475569';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 13;
+      ctx.beginPath();
+      ctx.moveTo(shoulderX, shoulderY);
+      ctx.lineTo(elbowX, elbowY);
+      ctx.stroke();
+
+      // Forearm reaching to the shooter grip
+      ctx.strokeStyle = '#fed7aa';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(elbowX, elbowY);
+      ctx.lineTo(gunOriginX, gunOriginY);
+      ctx.stroke();
+
+      // Draw Black Blaster + Gripping Hand rotated together toward aim target
       ctx.save();
-      ctx.translate(playerX, gunOriginY);
+      ctx.translate(gunOriginX, gunOriginY);
       ctx.rotate(aimAngle);
 
-      ctx.fillStyle = '#475569';
+      // Black Blaster grip / handle (behind hand)
+      ctx.fillStyle = '#090d16';
       ctx.beginPath();
-      ctx.roundRect(0, -6, 26, 12, 6);
+      ctx.roundRect(-6, -2, 12, 14, 3);
       ctx.fill();
 
+      // Matte Black Blaster body & barrel
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(-4, -7, 36, 12, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Dark metallic top rail detail
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(2, -9, 22, 3);
+
+      // Subtle barrel highlight line
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(4, -4, 24, 1.5);
+
+      // Blaster glowing red nozzle tip
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.roundRect(32, -5.5, 6, 9, 2);
+      ctx.fill();
+
+      // Man's Hand & Fingers wrapped around the shooter handle/body
+      ctx.fillStyle = '#fed7aa';
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(-5, -3, 14, 12, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      // Knuckle / finger lines on the grip
+      ctx.strokeStyle = '#c28b59';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-1, 2);
+      ctx.lineTo(6, 2);
+      ctx.moveTo(-1, 5.5);
+      ctx.lineTo(6, 5.5);
+      ctx.stroke();
+
+      // Thumb resting over top of the shooter
       ctx.fillStyle = '#fed7aa';
       ctx.beginPath();
-      ctx.arc(26, 0, 6, 0, Math.PI * 2);
+      ctx.ellipse(3, -5, 5, 2.8, -0.2, 0, Math.PI * 2);
       ctx.fill();
-
-      ctx.fillStyle = '#f59e0b';
-      ctx.beginPath();
-      ctx.roundRect(24, -5, 22, 10, 3);
-      ctx.fill();
-
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(44, -4, 4, 8);
 
       ctx.restore();
     };
@@ -638,49 +713,80 @@ export default function MosquitoGame() {
     >
       {/* Top HUD Bar */}
       <div
-        className={`flex items-center justify-between gap-2 bg-slate-900 px-3 sm:px-5 py-2.5 border-slate-700 ${
+        className={`flex items-center justify-between gap-2 bg-slate-900/95 backdrop-blur px-3 sm:px-5 py-2.5 border-slate-700 ${
           isFullscreen
             ? 'w-full border-b shrink-0'
             : 'w-full max-w-[800px] rounded-t-xl border border-b-0'
         }`}
       >
-        <div className="text-sm sm:text-xl font-bold text-yellow-400 shrink-0">
-          Score: {score}
+        {/* Animated Score Counter */}
+        <div className="flex items-center gap-1.5 text-sm sm:text-xl font-bold text-yellow-400 shrink-0">
+          <FaStar className="text-yellow-400 text-xs sm:text-base" />
+          <span>Score:</span>
+          <span
+            className={`inline-block transition-all duration-200 origin-left ${
+              scorePop
+                ? 'scale-125 text-white drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]'
+                : 'scale-100 text-yellow-400'
+            }`}
+          >
+            {score}
+          </span>
         </div>
 
-        {/* Health Bar */}
-        <div className="flex items-center gap-2 flex-1 max-w-[220px] mx-2">
-          <span className="text-xs font-semibold text-slate-300 shrink-0">HP:</span>
-          <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+        {/* Attractive Health Bar */}
+        <div className="flex items-center gap-2 flex-1 max-w-[240px] mx-2">
+          <FaHeart
+            className={`text-sm sm:text-base shrink-0 transition-transform ${
+              health > 50
+                ? 'text-emerald-400'
+                : health > 25
+                ? 'text-amber-400 animate-pulse'
+                : 'text-rose-500 animate-bounce'
+            }`}
+          />
+          <div className="relative w-full h-4 bg-slate-950 rounded-full p-0.5 border border-slate-700 shadow-inner overflow-hidden">
             <div
-              className={`h-full transition-all duration-200 ${
+              className={`h-full rounded-full transition-all duration-300 ease-out relative overflow-hidden ${
                 health > 50
-                  ? 'bg-green-500'
+                  ? 'bg-gradient-to-r from-emerald-600 via-green-500 to-lime-400 shadow-[0_0_10px_rgba(16,185,129,0.6)]'
                   : health > 25
-                  ? 'bg-yellow-500'
-                  : 'bg-red-600'
+                  ? 'bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.6)]'
+                  : 'bg-gradient-to-r from-red-700 via-rose-600 to-red-400 shadow-[0_0_12px_rgba(239,68,68,0.8)]'
               }`}
               style={{ width: `${health}%` }}
-            />
+            >
+              {/* Glossy top highlight */}
+              <div className="absolute inset-x-0 top-0 h-1/2 bg-white/25 rounded-full" />
+            </div>
           </div>
+          <span className="text-[11px] sm:text-xs font-extrabold text-slate-200 tabular-nums shrink-0 w-8 text-right">
+            {health}%
+          </span>
         </div>
 
-        {/* Right Controls: Mute & Fullscreen */}
+        {/* Right Controls: Icon-Only Mute & Fullscreen */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={toggleMute}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-lg text-xs sm:text-sm font-medium text-slate-200 transition"
-            title="Mute / Unmute"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+            title={isMuted ? 'Unmute' : 'Mute'}
+            className="cursor-pointer w-9 h-9 flex items-center justify-center bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-lg text-base sm:text-lg transition"
           >
-            {isMuted ? '🔇' : '🔊'}
+            {isMuted ? (
+              <FaVolumeMute className="text-rose-400" />
+            ) : (
+              <FaVolumeUp className="text-emerald-400" />
+            )}
           </button>
 
           <button
             onClick={toggleFullscreen}
-            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg text-xs sm:text-sm font-semibold text-white transition"
-            title="Toggle Fullscreen"
+            aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            className="cursor-pointer w-9 h-9 flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg text-base sm:text-lg text-white transition"
           >
-            {isFullscreen ? '✕ Exit' : '⛶ Full'}
+            {isFullscreen ? <FaCompress /> : <FaExpand />}
           </button>
         </div>
       </div>
@@ -713,17 +819,20 @@ export default function MosquitoGame() {
             </p>
             <button
               onClick={resetGame}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition"
+              className="cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition flex items-center gap-2"
             >
-              Try Sleeping Again
+              <FaRedo />
+              <span>Try Sleeping Again</span>
             </button>
           </div>
         )}
       </div>
 
       {!isFullscreen && (
-        <p className="text-xs sm:text-sm text-slate-400 text-center mt-2.5">
-          Tap anywhere to shoot • Tap <strong>⛶ Full</strong> at top-right for edge-to-edge mobile play
+        <p className="text-xs sm:text-sm text-slate-400 text-center mt-2.5 flex items-center justify-center gap-1.5">
+          <span>Tap anywhere to shoot • Tap</span>
+          <FaExpand className="text-slate-200 inline" />
+          <span>at top-right for edge-to-edge mobile play</span>
         </p>
       )}
     </div>
