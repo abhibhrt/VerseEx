@@ -109,6 +109,7 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
 
   // Shared cooldown so the two girls NEVER throw at the same time
   const globalThrowCooldownRef = useRef(55);
+  const throwCountRef = useRef(0);
 
   // Preload face images from GitHub
   useEffect(() => {
@@ -239,6 +240,7 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
     gameOverRef.current = false;
     screenShakeRef.current = 0;
     globalThrowCooldownRef.current = 50;
+    throwCountRef.current = 0;
     playerXRef.current = width / 2;
     targetPlayerXRef.current = width / 2;
     chocoGirlRef.current = { x: width * 0.3, vx: 2.3, jitterTimer: 0, throwAnim: 0 };
@@ -670,7 +672,7 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
       ctx.save();
 
       // Screen shake on bomb catch
-      if (screenShakeRef.current > 0) {
+    if (screenShakeRef.current > 0) {
         const dx = (Math.random() - 0.5) * screenShakeRef.current;
         const dy = (Math.random() - 0.5) * screenShakeRef.current;
         ctx.translate(dx, dy);
@@ -717,14 +719,18 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
       updateGirl(chocoGirlRef.current);
       updateGirl(bombGirlRef.current);
 
-      // 2. Non-Overlapping Throw Logic
+      // 2. Non-Overlapping Throw Logic (play throw sound once every 2 throws)
       globalThrowCooldownRef.current--;
       if (globalThrowCooldownRef.current <= 0 && !gameOverRef.current) {
+        throwCountRef.current += 1;
+        const shouldPlayThrowSound = throwCountRef.current % 2 === 0;
         const isChocoThrow = Math.random() < 0.62;
 
         if (isChocoThrow) {
           chocoGirlRef.current.throwAnim = 18;
-          playSound('throwchoco.mp3', 0.7);
+          if (shouldPlayThrowSound) {
+            playSound('throwchoco.mp3', 0.7);
+          }
           itemsRef.current.push({
             id: Math.random(),
             type: 'choco',
@@ -738,7 +744,9 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
           });
         } else {
           bombGirlRef.current.throwAnim = 18;
-          playSound('throwbomb.mp3', 0.7);
+          if (shouldPlayThrowSound) {
+            playSound('throwbomb.mp3', 0.7);
+          }
           itemsRef.current.push({
             id: Math.random(),
             type: 'bomb',
@@ -945,7 +953,6 @@ export default function CatcherGame({ onExit }: CatcherGameProps) {
     animationFrameId = requestAnimationFrame(updateAndRender);
     return () => cancelAnimationFrame(animationFrameId);
   }, [gameOver]);
-
   return (
     <div
       ref={containerRef}
