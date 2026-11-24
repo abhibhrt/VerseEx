@@ -251,7 +251,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
 
     let animationFrameId: number;
 
-    const spawnMosquito = () => {
+        const spawnMosquito = () => {
       const { width, height } = dimensionsRef.current;
       const playerX = width / 2;
       const playerY = height - 85;
@@ -275,9 +275,14 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
       const speed = 1.6 + Math.random() * 1.1 + scoreRef.current * 0.002;
 
       mosquitoSpawnCountRef.current += 1;
-      const arriveSound =
-        mosquitoSpawnCountRef.current % 2 === 1 ? 'onarrive1.mp3' : 'oarrive2.mp3';
-      playSound(arriveSound, 0.5);
+          
+      if (mosquitoSpawnCountRef.current % 2 === 0) {
+        const arriveSound =
+          (mosquitoSpawnCountRef.current / 2) % 2 === 1
+            ? 'onarrive1.mp3'
+            : 'oarrive2.mp3';
+        playSound(arriveSound, 0.5);
+      }
 
       mosquitoesRef.current.push({
         id: Math.random(),
@@ -288,6 +293,8 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
         radius: 18,
         wobbleOffset: Math.random() * Math.PI * 2,
       });
+    };
+
     };
 
     const createSplash = (x: number, y: number, color: string) => {
