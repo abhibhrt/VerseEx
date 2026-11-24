@@ -45,11 +45,8 @@ export default function MosquitoGame() {
   const reactionTimerRef = useRef(0);
   const currentFaceRef = useRef<'aim' | 'bite'>('aim');
 
-  // Logical canvas resolution (scales smoothly via CSS on mobile)
-  const CANVAS_WIDTH = 800;
-  const CANVAS_HEIGHT = 500;
-  const PLAYER_X = CANVAS_WIDTH / 2;
-  const PLAYER_Y = CANVAS_HEIGHT - 85;
+  // Dynamic logical dimensions so mobile portrait fills the whole screen cleanly
+  const dimensionsRef = useRef({ width: 800, height: 500 });
 
   // Game state refs
   const mouseRef = useRef({ x: 400, y: 200 });
@@ -73,25 +70,62 @@ export default function MosquitoGame() {
     imgBiteRef.current = imgBite;
   }, []);
 
-  // Listen for fullscreen changes (e.g., pressing Esc)
+  // Match canvas internal resolution to actual container aspect ratio (fixes mobile portrait squish)
+  useEffect(() => {
+    const updateCanvasResolution = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const aspect = rect.width / rect.height;
+      // Keep a consistent logical height/width scale while matching screen shape
+      if (aspect < 1) {
+        // Mobile Portrait
+        const logicalWidth = 480;
+        const logicalHeight = Math.round(logicalWidth / aspect);
+        canvas.width = logicalWidth;
+        canvas.height = logicalHeight;
+        dimensionsRef.current = { width: logicalWidth, height: logicalHeight };
+      } else {
+        // Desktop or Mobile Landscape
+        const logicalHeight = 500;
+        const logicalWidth = Math.round(logicalHeight * aspect);
+        canvas.width = logicalWidth;
+        canvas.height = logicalHeight;
+        dimensionsRef.current = { width: logicalWidth, height: logicalHeight };
+      }
+    };
+
+    updateCanvasResolution();
+    window.addEventListener('resize', updateCanvasResolution);
+    return () => window.removeEventListener('resize', updateCanvasResolution);
+  }, [isFullscreen]);
+
+  // Sync native fullscreen exit (Esc key / system back gesture)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Hybrid Fullscreen: uses Native API + CSS fixed-inset fallback (works on iOS Safari too!)
   const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
+    const nextState = !isFullscreen;
+    setIsFullscreen(nextState);
+
     try {
-      if (!document.fullscreenElement) {
-        await containerRef.current.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
+      if (nextState && containerRef.current && !document.fullscreenElement) {
+        await containerRef.current.requestFullscreen?.();
+      } else if (!nextState && document.fullscreenElement) {
+        await document.exitFullscreen?.();
       }
-    } catch (err) {
-      console.error('Fullscreen toggle failed:', err);
+    } catch {
+      // iOS Safari throws here—CSS fixed fullscreen state still fills 100% of screen!
     }
   };
 
@@ -133,16 +167,14 @@ export default function MosquitoGame() {
     setGameOver(false);
   };
 
-  // Convert screen coordinates (mouse or touch) to 800x500 logical canvas coordinates
   const getLogicalCoords = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 400, y: 200 };
+    if (!canvas) return { x: 240, y: 200 };
     const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_WIDTH / rect.width;
-    const scaleY = CANVAS_HEIGHT / rect.height;
+    const { width, height } = dimensionsRef.current;
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: ((clientX - rect.left) / rect.width) * width,
+      y: ((clientY - rect.top) / rect.height) * height,
     };
   };
 
@@ -153,22 +185,23 @@ export default function MosquitoGame() {
     triggerReaction('aim', 25);
     playSound('/media/onshoot.mp3', 0.6);
 
-    const gunOriginY = PLAYER_Y - 10;
-    const angle = Math.atan2(targetY - gunOriginY, targetX - PLAYER_X);
+    const { width, height } = dimensionsRef.current;
+    const playerX = width / 2;
+    const gunOriginY = height - 90;
+
+    const angle = Math.atan2(targetY - gunOriginY, targetX - playerX);
     const speed = 13;
 
     bulletsRef.current.push({
-      x: PLAYER_X + Math.cos(angle) * 35,
+      x: playerX + Math.cos(angle) * 35,
       y: gunOriginY + Math.sin(angle) * 35,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
     });
   };
 
-  // Desktop Pointer / Mouse Events
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const coords = getLogicalCoords(e.clientX, e.clientY);
-    mouseRef.current = coords;
+    mouseRef.current = getLogicalCoords(e.clientX, e.clientY);
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -182,23 +215,27 @@ export default function MosquitoGame() {
     let animationFrameId: number;
 
     const spawnMosquito = () => {
+      const { width, height } = dimensionsRef.current;
+      const playerX = width / 2;
+      const playerY = height - 85;
+
       const side = Math.floor(Math.random() * 3);
       let x = 0;
       let y = 0;
 
       if (side === 0) {
-        x = Math.random() * CANVAS_WIDTH;
+        x = Math.random() * width;
         y = -20;
       } else if (side === 1) {
         x = -20;
-        y = Math.random() * (CANVAS_HEIGHT * 0.55);
+        y = Math.random() * (height * 0.55);
       } else {
-        x = CANVAS_WIDTH + 20;
-        y = Math.random() * (CANVAS_HEIGHT * 0.55);
+        x = width + 20;
+        y = Math.random() * (height * 0.55);
       }
 
-      const angle = Math.atan2(PLAYER_Y - y, PLAYER_X - x);
-      const speed = 1.5 + Math.random() * 1.1 + scoreRef.current * 0.002;
+      const angle = Math.atan2(playerY - y, playerX - x);
+      const speed = 1.6 + Math.random() * 1.1 + scoreRef.current * 0.002;
 
       mosquitoSpawnCountRef.current += 1;
       const arriveSound =
@@ -213,7 +250,7 @@ export default function MosquitoGame() {
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        radius: 16,
+        radius: 18,
         wobbleOffset: Math.random() * Math.PI * 2,
       });
     };
@@ -233,7 +270,6 @@ export default function MosquitoGame() {
       }
     };
 
-    // Helper to draw a detailed mosquito rotated toward its flight direction
     const drawMosquito = (ctx: CanvasRenderingContext2D, m: Mosquito, frame: number) => {
       const angle = Math.atan2(m.vy, m.vx);
 
@@ -241,257 +277,237 @@ export default function MosquitoGame() {
       ctx.translate(m.x, m.y);
       ctx.rotate(angle);
 
-      // 1. Long Thin Legs (3 pairs trailing backward)
+      // 1. Long Thin Legs
       ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.6;
       for (let i = -1; i <= 1; i += 2) {
-        // Front leg
         ctx.beginPath();
         ctx.moveTo(2, 0);
-        ctx.lineTo(6, i * 11);
-        ctx.lineTo(11, i * 15);
+        ctx.lineTo(6, i * 12);
+        ctx.lineTo(12, i * 16);
         ctx.stroke();
 
-        // Middle leg
         ctx.beginPath();
         ctx.moveTo(-2, 0);
-        ctx.lineTo(-5, i * 13);
-        ctx.lineTo(-10, i * 17);
+        ctx.lineTo(-5, i * 14);
+        ctx.lineTo(-11, i * 18);
         ctx.stroke();
 
-        // Back leg
         ctx.beginPath();
         ctx.moveTo(-6, 0);
-        ctx.lineTo(-14, i * 11);
-        ctx.lineTo(-20, i * 14);
+        ctx.lineTo(-15, i * 12);
+        ctx.lineTo(-21, i * 15);
         ctx.stroke();
       }
 
-      // 2. Striped Abdomen (Tail)
+      // 2. Striped Abdomen
       ctx.fillStyle = '#334155';
       ctx.beginPath();
-      ctx.ellipse(-10, 0, 9, 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(-10, 0, 10, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // White stripes on abdomen
       ctx.fillStyle = '#e2e8f0';
-      ctx.fillRect(-14, -2.5, 2, 5);
-      ctx.fillRect(-10, -3, 2, 6);
-      ctx.fillRect(-6, -2.5, 2, 5);
+      ctx.fillRect(-15, -3, 2.2, 6);
+      ctx.fillRect(-10, -3.5, 2.2, 7);
+      ctx.fillRect(-5, -3, 2.2, 6);
 
-      // 3. Thorax (Body center)
+      // 3. Thorax
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
-      ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
       ctx.fill();
 
-      // 4. Head & Eyes
+      // 4. Head & Glowing Red Eyes
       ctx.fillStyle = '#1e293b';
       ctx.beginPath();
-      ctx.arc(6, 0, 3, 0, Math.PI * 2);
+      ctx.arc(6.5, 0, 3.2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Glowing red eyes
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
-      ctx.arc(7, -1.5, 1.2, 0, Math.PI * 2);
-      ctx.arc(7, 1.5, 1.2, 0, Math.PI * 2);
+      ctx.arc(7.5, -1.6, 1.3, 0, Math.PI * 2);
+      ctx.arc(7.5, 1.6, 1.3, 0, Math.PI * 2);
       ctx.fill();
 
-      // 5. Sharp Needle Proboscis (Stinger)
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.5;
+      // 5. Sharp Proboscis (Stinger)
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(8, 0);
-      ctx.lineTo(18, 0);
+      ctx.moveTo(9, 0);
+      ctx.lineTo(20, 0);
       ctx.stroke();
 
       // 6. Fast-flapping translucent wings
-      const wingSpread = Math.sin(frame * 1.1) * 7 + 9;
-      ctx.fillStyle = 'rgba(226, 232, 240, 0.55)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      const wingSpread = Math.sin(frame * 1.1) * 7 + 10;
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.6)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.lineWidth = 0.8;
 
-      // Left wing
       ctx.beginPath();
-      ctx.ellipse(-3, -wingSpread * 0.7, 9, 3.5, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(-3, -wingSpread * 0.7, 10, 3.8, -0.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Right wing
       ctx.beginPath();
-      ctx.ellipse(-3, wingSpread * 0.7, 9, 3.5, 0.5, 0, Math.PI * 2);
+      ctx.ellipse(-3, wingSpread * 0.7, 10, 3.8, 0.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
       ctx.restore();
     };
 
-    // Helper to draw a realistic bedroom, cozy bed, and man lying in bed
     const drawScene = (ctx: CanvasRenderingContext2D) => {
-      // 1. Bedroom Wall & Moonlight Window
-      const wallGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+      const { width, height } = dimensionsRef.current;
+      const playerX = width / 2;
+      const playerY = height - 85;
+
+      // 1. Bedroom Wall
+      const wallGrad = ctx.createLinearGradient(0, 0, 0, height);
       wallGrad.addColorStop(0, '#090d16');
       wallGrad.addColorStop(1, '#1e293b');
       ctx.fillStyle = wallGrad;
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillRect(0, 0, width, height);
 
-      // Bedroom Window (top left)
+      // Bedroom Window
+      const winX = Math.min(50, width * 0.08);
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(60, 45, 110, 140);
-      // Window glass moonlight
+      ctx.fillRect(winX, 45, 100, 130);
       ctx.fillStyle = '#1e3a8a';
-      ctx.fillRect(68, 53, 44, 58);
-      ctx.fillRect(118, 53, 44, 58);
-      ctx.fillRect(68, 117, 44, 60);
-      ctx.fillRect(118, 117, 44, 60);
-      // Moon
+      ctx.fillRect(winX + 7, 52, 40, 54);
+      ctx.fillRect(winX + 53, 52, 40, 54);
+      ctx.fillRect(winX + 7, 112, 40, 56);
+      ctx.fillRect(winX + 53, 112, 40, 56);
       ctx.fillStyle = '#fef08a';
       ctx.beginPath();
-      ctx.arc(92, 80, 12, 0, Math.PI * 2);
+      ctx.arc(winX + 28, 78, 11, 0, Math.PI * 2);
       ctx.fill();
 
-      // Wooden Floorboard at bottom
+      // Floorboard
       ctx.fillStyle = '#27170d';
-      ctx.fillRect(0, CANVAS_HEIGHT - 45, CANVAS_WIDTH, 45);
+      ctx.fillRect(0, height - 45, width, 45);
 
-      // 2. Stylish Wooden Bed (Centered at bottom)
-      const bedW = 240;
-      const bedX = PLAYER_X - bedW / 2;
+      // 2. Wooden Bed
+      const bedW = Math.min(240, width * 0.56);
+      const bedX = playerX - bedW / 2;
 
-      // Headboard with wooden panels
       ctx.fillStyle = '#451a03';
       ctx.beginPath();
-      ctx.roundRect(bedX - 8, PLAYER_Y - 75, bedW + 16, 85, [12, 12, 0, 0]);
+      ctx.roundRect(bedX - 8, playerY - 75, bedW + 16, 85, [12, 12, 0, 0]);
       ctx.fill();
 
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 3;
-      ctx.strokeRect(bedX + 4, PLAYER_Y - 65, bedW / 2 - 12, 50);
-      ctx.strokeRect(PLAYER_X + 8, PLAYER_Y - 65, bedW / 2 - 12, 50);
+      ctx.strokeRect(bedX + 4, playerY - 65, bedW / 2 - 10, 50);
+      ctx.strokeRect(playerX + 6, playerY - 65, bedW / 2 - 10, 50);
 
-      // White Mattress
+      // Mattress
       ctx.fillStyle = '#f1f5f9';
       ctx.beginPath();
-      ctx.roundRect(bedX, PLAYER_Y - 25, bedW, 85, 8);
+      ctx.roundRect(bedX, playerY - 25, bedW, 85, 8);
       ctx.fill();
 
-      // Fluffy Pillow
+      // Pillow
+      const pillowW = Math.min(130, bedW * 0.55);
       ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = 'rgba(0,0,0,0.25)';
-      ctx.shadowBlur = 8;
       ctx.beginPath();
-      ctx.roundRect(PLAYER_X - 65, PLAYER_Y - 45, 130, 42, 14);
+      ctx.roundRect(playerX - pillowW / 2, playerY - 45, pillowW, 42, 14);
       ctx.fill();
-      ctx.shadowBlur = 0;
 
-      // 3. Man's Body & Arms Under Cozy Duvet/Blanket
-      // Shoulders / Pajama shirt
+      // 3. Man's Pajama Shoulders & Blanket
       ctx.fillStyle = '#334155';
       ctx.beginPath();
-      ctx.roundRect(PLAYER_X - 48, PLAYER_Y - 8, 96, 35, 16);
+      ctx.roundRect(playerX - 46, playerY - 8, 92, 35, 16);
       ctx.fill();
 
-      // Cozy Quilt / Blanket covering lower body
-      const blanketGrad = ctx.createLinearGradient(0, PLAYER_Y + 5, 0, CANVAS_HEIGHT);
+      const blanketGrad = ctx.createLinearGradient(0, playerY + 5, 0, height);
       blanketGrad.addColorStop(0, '#2563eb');
       blanketGrad.addColorStop(1, '#1d4ed8');
       ctx.fillStyle = blanketGrad;
       ctx.beginPath();
-      ctx.roundRect(bedX - 4, PLAYER_Y + 8, bedW + 8, 65, [12, 12, 4, 4]);
+      ctx.roundRect(bedX - 4, playerY + 8, bedW + 8, 65, [12, 12, 4, 4]);
       ctx.fill();
 
-      // Folded top edge of blanket
       ctx.fillStyle = '#93c5fd';
-      ctx.fillRect(bedX - 4, PLAYER_Y + 8, bedW + 8, 12);
+      ctx.fillRect(bedX - 4, playerY + 8, bedW + 8, 12);
 
-      // Bed Footboard
+      // Footboard
       ctx.fillStyle = '#451a03';
-      ctx.fillRect(bedX - 10, CANVAS_HEIGHT - 22, bedW + 20, 22);
+      ctx.fillRect(bedX - 10, height - 22, bedW + 20, 22);
 
-      // 4. Man's Head (Using onaim.png / onbite.png)
+      // 4. Man's Face (.png)
       const faceImg =
         currentFaceRef.current === 'bite' ? imgBiteRef.current : imgAimRef.current;
       const faceRadius = 30;
-      const faceY = PLAYER_Y - 26;
+      const faceY = playerY - 26;
 
       ctx.save();
       ctx.beginPath();
-      ctx.arc(PLAYER_X, faceY, faceRadius, 0, Math.PI * 2);
+      ctx.arc(playerX, faceY, faceRadius, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
       if (faceImg && faceImg.complete && faceImg.naturalWidth > 0) {
         ctx.drawImage(
           faceImg,
-          PLAYER_X - faceRadius,
+          playerX - faceRadius,
           faceY - faceRadius,
           faceRadius * 2,
           faceRadius * 2
         );
       } else {
-        // Fallback illustrated face if PNG isn't loaded yet
         ctx.fillStyle = '#fed7aa';
-        ctx.fillRect(PLAYER_X - faceRadius, faceY - faceRadius, faceRadius * 2, faceRadius * 2);
+        ctx.fillRect(playerX - faceRadius, faceY - faceRadius, faceRadius * 2, faceRadius * 2);
       }
       ctx.restore();
 
-      // Ring glow around face
       ctx.strokeStyle = currentFaceRef.current === 'bite' ? '#ef4444' : '#38bdf8';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(PLAYER_X, faceY, faceRadius, 0, Math.PI * 2);
+      ctx.arc(playerX, faceY, faceRadius, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Bite alert text
       if (currentFaceRef.current === 'bite' && reactionTimerRef.current > 0) {
         ctx.fillStyle = '#ef4444';
         ctx.font = 'bold 18px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('OUCH! BITTEN!', PLAYER_X, faceY - 40);
+        ctx.fillText('OUCH! BITTEN!', playerX, faceY - 40);
       }
 
-      // 5. Aiming Arm, Blaster & Laser Sight
-      const gunOriginY = PLAYER_Y - 6;
+      // 5. Aiming Arm, Blaster & Laser
+      const gunOriginY = playerY - 6;
       const aimAngle = Math.atan2(
         mouseRef.current.y - gunOriginY,
-        mouseRef.current.x - PLAYER_X
+        mouseRef.current.x - playerX
       );
 
-      // Laser sight beam
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.moveTo(PLAYER_X, gunOriginY);
+      ctx.moveTo(playerX, gunOriginY);
       ctx.lineTo(mouseRef.current.x, mouseRef.current.y);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Aiming Arm & Toy Blaster rotated toward target
       ctx.save();
-      ctx.translate(PLAYER_X, gunOriginY);
+      ctx.translate(playerX, gunOriginY);
       ctx.rotate(aimAngle);
 
-      // Arm sleeve
       ctx.fillStyle = '#475569';
       ctx.beginPath();
       ctx.roundRect(0, -6, 26, 12, 6);
       ctx.fill();
 
-      // Hand
       ctx.fillStyle = '#fed7aa';
       ctx.beginPath();
       ctx.arc(26, 0, 6, 0, Math.PI * 2);
       ctx.fill();
 
-      // Blaster barrel
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       ctx.roundRect(24, -5, 22, 10, 3);
       ctx.fill();
 
-      // Blaster tip
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(44, -4, 4, 8);
 
@@ -502,6 +518,10 @@ export default function MosquitoGame() {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
+
+      const { width, height } = dimensionsRef.current;
+      const playerX = width / 2;
+      const playerY = height - 85;
 
       frameCountRef.current++;
 
@@ -516,7 +536,6 @@ export default function MosquitoGame() {
         spawnMosquito();
       }
 
-      // Draw Bedroom, Bed, Man, and Aiming Blaster
       drawScene(ctx);
 
       // Update & Draw Bullets
@@ -524,8 +543,7 @@ export default function MosquitoGame() {
         b.x += b.vx;
         b.y += b.vy;
 
-        const isInside =
-          b.x > 0 && b.x < CANVAS_WIDTH && b.y > 0 && b.y < CANVAS_HEIGHT;
+        const isInside = b.x > 0 && b.x < width && b.y > 0 && b.y < height;
 
         if (!isInside) {
           playSound('/media/onmiss.mp3', 0.5);
@@ -533,12 +551,9 @@ export default function MosquitoGame() {
         }
 
         ctx.fillStyle = '#fde047';
-        ctx.shadowColor = '#facc15';
-        ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         return true;
       });
@@ -553,11 +568,10 @@ export default function MosquitoGame() {
         m.x += m.vx + jitterX;
         m.y += m.vy + jitterY;
 
-        // Check Bullet Hit
         let hit = false;
         bulletsRef.current = bulletsRef.current.filter((b) => {
           const dist = Math.hypot(b.x - m.x, b.y - m.y);
-          if (dist < m.radius + 6) {
+          if (dist < m.radius + 8) {
             hit = true;
             return false;
           }
@@ -571,14 +585,13 @@ export default function MosquitoGame() {
           continue;
         }
 
-        // Check Bite on Man
-        const distToPlayer = Math.hypot(m.x - PLAYER_X, m.y - (PLAYER_Y - 20));
+        const distToPlayer = Math.hypot(m.x - playerX, m.y - (playerY - 20));
         if (distToPlayer < 48) {
           triggerReaction('bite', 45);
           playSound('/media/onbite.mp3', 0.8);
           healthRef.current = Math.max(0, healthRef.current - 15);
           setHealth(healthRef.current);
-          createSplash(PLAYER_X, PLAYER_Y - 20, '#dc2626');
+          createSplash(playerX, playerY - 20, '#dc2626');
 
           if (healthRef.current <= 0) {
             setGameOver(true);
@@ -617,22 +630,28 @@ export default function MosquitoGame() {
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col items-center justify-center w-full select-none bg-slate-950 ${
-        isFullscreen ? 'h-screen p-2 sm:p-4' : 'min-h-screen p-3 sm:p-6'
-      }`}
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-50 w-screen h-dvh flex flex-col bg-slate-950 select-none overflow-hidden'
+          : 'w-full min-h-dvh flex flex-col items-center justify-center bg-slate-950 p-2 sm:p-6 select-none'
+      }
     >
-      {/* Responsive Top HUD Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 w-full max-w-[800px] bg-slate-900 px-3 sm:px-6 py-2.5 sm:py-3 rounded-t-xl border border-b-0 border-slate-700">
-        <div className="text-base sm:text-xl font-bold text-yellow-400">
+      {/* Top HUD Bar */}
+      <div
+        className={`flex items-center justify-between gap-2 bg-slate-900 px-3 sm:px-5 py-2.5 border-slate-700 ${
+          isFullscreen
+            ? 'w-full border-b shrink-0'
+            : 'w-full max-w-[800px] rounded-t-xl border border-b-0'
+        }`}
+      >
+        <div className="text-sm sm:text-xl font-bold text-yellow-400 shrink-0">
           Score: {score}
         </div>
 
         {/* Health Bar */}
-        <div className="flex items-center gap-2 order-3 sm:order-2 w-full sm:w-auto justify-between sm:justify-start">
-          <span className="text-xs sm:text-sm font-semibold text-slate-300">
-            Sleep HP:
-          </span>
-          <div className="flex-1 sm:w-40 h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+        <div className="flex items-center gap-2 flex-1 max-w-[220px] mx-2">
+          <span className="text-xs font-semibold text-slate-300 shrink-0">HP:</span>
+          <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <div
               className={`h-full transition-all duration-200 ${
                 health > 50
@@ -647,7 +666,7 @@ export default function MosquitoGame() {
         </div>
 
         {/* Right Controls: Mute & Fullscreen */}
-        <div className="flex items-center gap-2 order-2 sm:order-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={toggleMute}
             className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-lg text-xs sm:text-sm font-medium text-slate-200 transition"
@@ -658,37 +677,43 @@ export default function MosquitoGame() {
 
           <button
             onClick={toggleFullscreen}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-lg text-xs sm:text-sm font-medium text-slate-200 transition flex items-center gap-1"
+            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg text-xs sm:text-sm font-semibold text-white transition"
             title="Toggle Fullscreen"
           >
-            {isFullscreen ? '🗗 Exit' : '⛶ Fullscreen'}
+            {isFullscreen ? '✕ Exit' : '⛶ Full'}
           </button>
         </div>
       </div>
 
-      {/* Responsive Canvas Container */}
-      <div className="relative w-full max-w-[800px] aspect-[8/5] max-h-[80vh]">
+      {/* Game Canvas Wrapper */}
+      <div
+        className={
+          isFullscreen
+            ? 'relative flex-1 w-full h-full overflow-hidden'
+            : 'relative w-full max-w-[800px] h-[68dvh] sm:h-[500px]'
+        }
+      >
         <canvas
           ref={canvasRef}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
-          className="w-full h-full block border-2 border-slate-700 rounded-b-xl cursor-crosshair shadow-2xl touch-none"
+          className={`w-full h-full block cursor-crosshair touch-none ${
+            isFullscreen ? '' : 'border-2 border-slate-700 rounded-b-xl shadow-2xl'
+          }`}
         />
 
         {gameOver && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 rounded-b-xl text-white p-4 text-center">
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-red-500 mb-2">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 text-white p-4 text-center">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-red-500 mb-2">
               Too Many Bites!
             </h2>
-            <p className="text-base sm:text-lg text-slate-300 mb-5">
+            <p className="text-base sm:text-lg text-slate-300 mb-6">
               Final Score:{' '}
               <span className="font-bold text-yellow-400">{score}</span>
             </p>
             <button
               onClick={resetGame}
-              className="px-5 py-2.5 sm:px-6 sm:py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg font-bold text-base sm:text-lg transition"
             >
               Try Sleeping Again
             </button>
@@ -696,9 +721,11 @@ export default function MosquitoGame() {
         )}
       </div>
 
-      <p className="text-xs sm:text-sm text-slate-400 text-center mt-3">
-        Tap anywhere on mobile (or click on desktop) to aim and shoot mosquitoes!
-      </p>
+      {!isFullscreen && (
+        <p className="text-xs sm:text-sm text-slate-400 text-center mt-2.5">
+          Tap anywhere to shoot • Tap <strong>⛶ Full</strong> at top-right for edge-to-edge mobile play
+        </p>
+      )}
     </div>
   );
 }
