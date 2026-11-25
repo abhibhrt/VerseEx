@@ -2,10 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FaRocket, FaGalacticRepublic, FaShieldAlt } from 'react-icons/fa';
-import { PiLaptop, PiPlanet } from 'react-icons/pi';
-import { GiAstronautHelmet } from 'react-icons/gi';
-import { MdOutlineExplore, MdChat, MdQuiz, MdGamepad } from 'react-icons/md';
+import { FaRocket, FaGalacticRepublic, FaShieldAlt, FaSatellite } from 'react-icons/fa';
+import { PiLaptop, PiPlanet, PiShootingStar } from 'react-icons/pi';
+import { GiAstronautHelmet, GiGalaxy } from 'react-icons/gi';
+import { MdOutlineExplore, MdGamepad, MdSensors } from 'react-icons/md';
 
 export default function Footer() {
     return (
@@ -60,33 +60,37 @@ export default function Footer() {
                                 3D-Theatre
                             </Link>
                         </li>
+                        <li>
+                            <Link href="/games" className="hover:text-cyan-400 transition-colors flex items-center gap-2">
+                                <MdGamepad className="text-[10px] text-zinc-600" />
+                                Meme Games
+                            </Link>
+                        </li>
                     </ul>
                 </div>
 
-                {/* Interactive Features */}
+                {/* Future Plans */}
                 <div className="space-y-4">
                     <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-200 flex items-center gap-2">
-                        <PiPlanet className="text-cyan-400" />
-                        Experience
+                        <PiShootingStar className="text-cyan-400" />
+                        Future Plans
                     </h3>
-                    <ul className="space-y-2.5 text-xs">
-                        <li>
-                            <Link href="/chatex" className="hover:text-cyan-400 transition-colors flex items-center gap-2">
-                                <MdChat className="text-[10px] text-zinc-600" />
-                                ChatEx AI
-                            </Link>
+                    <ul className="space-y-2.5 text-xs text-zinc-500">
+                        <li className="flex items-center gap-2">
+                            <FaSatellite className="text-[10px] text-cyan-500/70 shrink-0" />
+                            <span>Live Telemetry & Satellite Tracking</span>
                         </li>
-                        <li>
-                            <Link href="/quizzes" className="hover:text-cyan-400 transition-colors flex items-center gap-2">
-                                <MdQuiz className="text-[10px] text-zinc-600" />
-                                Cosmic Quizzes
-                            </Link>
+                        <li className="flex items-center gap-2">
+                            <GiGalaxy className="text-[10px] text-cyan-500/70 shrink-0" />
+                            <span>Deep-Space Exoplanet Explorer</span>
                         </li>
-                        <li>
-                            <Link href="/game" className="hover:text-cyan-400 transition-colors flex items-center gap-2">
-                                <MdGamepad className="text-[10px] text-zinc-600" />
-                                Play Game
-                            </Link>
+                        <li className="flex items-center gap-2">
+                            <MdSensors className="text-[10px] text-cyan-500/70 shrink-0" />
+                            <span>VR/AR Immersive Observatory</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <GiAstronautHelmet className="text-[10px] text-cyan-500/70 shrink-0" />
+                            <span>Multiplayer Cosmic Missions</span>
                         </li>
                     </ul>
                 </div>
