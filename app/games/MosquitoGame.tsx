@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -76,6 +75,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
   const scoreRef = useRef(0);
   const frameCountRef = useRef(0);
   const mosquitoSpawnCountRef = useRef(0);
+  const gameOverRef = useRef(false);
   const isMutedRef = useRef(false);
 
   // Trigger pop animation whenever score increases
@@ -183,6 +183,13 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
     }
   };
 
+  const triggerGameOver = () => {
+    if (gameOverRef.current) return;
+    gameOverRef.current = true;
+    playSound('over.mp3', 0.85);
+    setGameOver(true);
+  };
+
   const triggerReaction = (face: 'aim' | 'bite', duration = 30) => {
     currentFaceRef.current = face;
     reactionTimerRef.current = duration;
@@ -197,6 +204,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
     frameCountRef.current = 0;
     mosquitoSpawnCountRef.current = 0;
     reactionTimerRef.current = 0;
+    gameOverRef.current = false;
     currentFaceRef.current = 'aim';
     setScore(0);
     setHealth(100);
@@ -273,7 +281,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
       }
 
       const angle = Math.atan2(playerY - y, playerX - x);
-      const speed = 1.6 + Math.random() * 1.1 + scoreRef.current * 0.002;
+      const speed = 1.5 + Math.random() * 1.0 + scoreRef.current * 0.0015;
 
       mosquitoSpawnCountRef.current += 1;
       // Play once every 2 mosquitoes, alternating arrive1 & arrive2:
@@ -454,7 +462,8 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
       ctx.beginPath();
       ctx.roundRect(playerX - pillowW / 2, playerY - 45, pillowW, 42, 14);
       ctx.fill();
-// 3. Man's Pajama Shoulders & Blanket
+
+      // 3. Man's Pajama Shoulders & Blanket
       ctx.fillStyle = '#334155';
       ctx.beginPath();
       ctx.roundRect(playerX - 46, playerY - 8, 92, 35, 16);
@@ -631,7 +640,8 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
         currentFaceRef.current = 'aim';
       }
 
-      const spawnRate = Math.max(25, 70 - Math.floor(scoreRef.current / 50));
+      // Reduced mosquito spawn frequency (starts at 105 frames, caps at 45 frames)
+      const spawnRate = Math.max(45, 105 - Math.floor(scoreRef.current / 80));
       if (frameCountRef.current % spawnRate === 0) {
         spawnMosquito();
       }
@@ -684,8 +694,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
           createSplash(m.x, m.y, '#ef4444');
           continue;
         }
-
-        const distToPlayer = Math.hypot(m.x - playerX, m.y - (playerY - 20));
+const distToPlayer = Math.hypot(m.x - playerX, m.y - (playerY - 20));
         if (distToPlayer < 48) {
           triggerReaction('bite', 45);
           playSound('onbite.mp3', 0.8);
@@ -694,7 +703,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
           createSplash(playerX, playerY - 20, '#dc2626');
 
           if (healthRef.current <= 0) {
-            setGameOver(true);
+            triggerGameOver();
           }
           continue;
         }
@@ -727,7 +736,7 @@ export default function MosquitoGame({ onExit }: MosquitoGameProps) {
     return () => cancelAnimationFrame(animationFrameId);
   }, [gameOver]);
 
-return (
+  return (
     <div
       ref={containerRef}
       className={
